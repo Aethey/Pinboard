@@ -1,0 +1,170 @@
+//
+//  BoardCard.swift
+//  Pinboard
+//
+
+import AppKit
+import Foundation
+import SwiftData
+
+enum CardKind: String, CaseIterable, Identifiable {
+    case text
+    case markdown
+    case image
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .text:
+            "Text"
+        case .markdown:
+            "Markdown"
+        case .image:
+            "Image"
+        }
+    }
+
+}
+
+enum CardTheme: String, CaseIterable, Identifiable {
+    case graphite
+    case indigo
+    case teal
+    case amber
+    case rose
+
+    var id: String { rawValue }
+}
+
+@Model
+final class BoardCard {
+    @Attribute(.unique) var id: UUID
+    var kindRawValue: String
+    var title: String
+    var content: String
+    @Attribute(.externalStorage) var imageData: Data?
+    var imagePixelWidth: Double?
+    var imagePixelHeight: Double?
+    var positionX: Double
+    var positionY: Double
+    var width: Double
+    var height: Double
+    var opacity: Double
+    var themeRawValue: String
+    var zIndex: Int
+    var isLocked: Bool
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(
+        id: UUID = UUID(),
+        kind: CardKind,
+        title: String? = nil,
+        content: String = "",
+        imageData: Data? = nil,
+        imagePixelWidth: Double? = nil,
+        imagePixelHeight: Double? = nil,
+        positionX: Double = 320,
+        positionY: Double = 260,
+        width: Double = 390,
+        height: Double = 240,
+        opacity: Double = 0.94,
+        theme: CardTheme = .graphite,
+        zIndex: Int = 0,
+        isLocked: Bool = false,
+        createdAt: Date = .now,
+        updatedAt: Date = .now
+    ) {
+        self.id = id
+        self.kindRawValue = kind.rawValue
+        self.title = title ?? kind.title
+        self.content = content
+        self.imageData = imageData
+        self.imagePixelWidth = imagePixelWidth
+        self.imagePixelHeight = imagePixelHeight
+        self.positionX = positionX
+        self.positionY = positionY
+        self.width = width
+        self.height = height
+        self.opacity = opacity
+        self.themeRawValue = theme.rawValue
+        self.zIndex = zIndex
+        self.isLocked = isLocked
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    var kind: CardKind {
+        get { CardKind(rawValue: kindRawValue) ?? .text }
+        set { kindRawValue = newValue.rawValue }
+    }
+
+    var theme: CardTheme {
+        get { CardTheme(rawValue: themeRawValue) ?? .graphite }
+        set { themeRawValue = newValue.rawValue }
+    }
+
+    var image: NSImage? {
+        guard let imageData else { return nil }
+        return NSImage(data: imageData)
+    }
+
+    var imageHeightToWidthRatio: Double? {
+        if let imagePixelWidth,
+           let imagePixelHeight,
+           imagePixelWidth > 0,
+           imagePixelHeight > 0 {
+            return imagePixelHeight / imagePixelWidth
+        }
+
+        guard let image, image.size.width > 0, image.size.height > 0 else { return nil }
+        return image.size.height / image.size.width
+    }
+}
+
+extension BoardCard {
+    static func welcomeCards() -> [BoardCard] {
+        [
+            BoardCard(
+                kind: .markdown,
+                title: "Welcome to Pinboard",
+                content: """
+                # Spread ideas across space
+
+                Create cards, drag them anywhere, and resize from the lower-right corner.
+
+                Press **⌥ Space** to switch between Board and Desktop modes.
+                """,
+                positionX: 300,
+                positionY: 245,
+                width: 390,
+                height: 300,
+                theme: .indigo,
+                zIndex: 0
+            ),
+            BoardCard(
+                kind: .text,
+                title: "Interview notes",
+                content: "Keep the facts you need in sight.\n\n• Key numbers\n• Questions to ask\n• Short examples",
+                positionX: 730,
+                positionY: 260,
+                width: 390,
+                height: 260,
+                theme: .teal,
+                zIndex: 1
+            ),
+            BoardCard(
+                kind: .markdown,
+                title: "Desktop mode",
+                content: "Cards stay visible while the canvas becomes transparent. The window becomes click-through so it never blocks the app underneath.",
+                positionX: 520,
+                positionY: 560,
+                width: 420,
+                height: 230,
+                theme: .amber,
+                zIndex: 2
+            ),
+        ]
+    }
+}
