@@ -6,8 +6,42 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A10000000000000000000004 /* PinboardMCP.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* PinboardMCP.swift */; };
+		A10000000000000000000005 /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000000F /* MCP */; };
+		A10000000000000000000006 /* pinboard-mcp in Embed MCP Helper */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* pinboard-mcp */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A10000000000000000000011 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 12AF63C33040415E009C8856 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A1000000000000000000000A;
+			remoteInfo = PinboardMCP;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A10000000000000000000009 /* Embed MCP Helper */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				A10000000000000000000006 /* pinboard-mcp in Embed MCP Helper */,
+			);
+			name = "Embed MCP Helper";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		12AF63CB3040415E009C8856 /* Pinboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pinboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000001 /* pinboard-mcp */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "pinboard-mcp"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000002 /* PinboardMCP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinboardMCP.swift; sourceTree = "<group>"; };
+		A10000000000000000000013 /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = "<group>"; };
+		A10000000000000000000014 /* Package.resolved */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Package.resolved; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -39,6 +73,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A10000000000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000005 /* MCP in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -46,6 +88,7 @@
 			isa = PBXGroup;
 			children = (
 				12AF63CD3040415E009C8856 /* Pinboard */,
+				A10000000000000000000003 /* MCP */,
 				12AF63CC3040415E009C8856 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -54,8 +97,35 @@
 			isa = PBXGroup;
 			children = (
 				12AF63CB3040415E009C8856 /* Pinboard.app */,
+				A10000000000000000000001 /* pinboard-mcp */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000003 /* MCP */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000013 /* Package.swift */,
+				A10000000000000000000014 /* Package.resolved */,
+				A10000000000000000000015 /* Sources */,
+			);
+			path = MCP;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000015 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000016 /* PinboardMCP */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000016 /* PinboardMCP */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000002 /* PinboardMCP.swift */,
+			);
+			path = PinboardMCP;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -68,10 +138,12 @@
 				12AF63C73040415E009C8856 /* Sources */,
 				12AF63C83040415E009C8856 /* Frameworks */,
 				12AF63C93040415E009C8856 /* Resources */,
+				A10000000000000000000009 /* Embed MCP Helper */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A10000000000000000000010 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				12AF63CD3040415E009C8856 /* Pinboard */,
@@ -82,6 +154,25 @@
 			productName = Pinboard;
 			productReference = 12AF63CB3040415E009C8856 /* Pinboard.app */;
 			productType = "com.apple.product-type.application";
+		};
+		A1000000000000000000000A /* PinboardMCP */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1000000000000000000000D /* Build configuration list for PBXNativeTarget "PinboardMCP" */;
+			buildPhases = (
+				A10000000000000000000007 /* Sources */,
+				A10000000000000000000008 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PinboardMCP;
+			packageProductDependencies = (
+				A1000000000000000000000F /* MCP */,
+			);
+			productName = PinboardMCP;
+			productReference = A10000000000000000000001 /* pinboard-mcp */;
+			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
@@ -96,6 +187,9 @@
 					12AF63CA3040415E009C8856 = {
 						CreatedOnToolsVersion = 26.6;
 					};
+					A1000000000000000000000A = {
+						CreatedOnToolsVersion = 26.6;
+					};
 				};
 			};
 			buildConfigurationList = 12AF63C63040415E009C8856 /* Build configuration list for PBXProject "Pinboard" */;
@@ -107,12 +201,16 @@
 			);
 			mainGroup = 12AF63C23040415E009C8856;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A1000000000000000000000E /* XCRemoteSwiftPackageReference "swift-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 12AF63CC3040415E009C8856 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				12AF63CA3040415E009C8856 /* Pinboard */,
+				A1000000000000000000000A /* PinboardMCP */,
 			);
 		};
 /* End PBXProject section */
@@ -135,7 +233,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A10000000000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000004 /* PinboardMCP.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A10000000000000000000010 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A1000000000000000000000A /* PinboardMCP */;
+			targetProxy = A10000000000000000000011 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		12AF63D43040415F009C8856 /* Debug */ = {
@@ -322,6 +436,34 @@
 			};
 			name = Release;
 		};
+		A1000000000000000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 38N3R8P926;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_NAME = "pinboard-mcp";
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A1000000000000000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 38N3R8P926;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_NAME = "pinboard-mcp";
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -343,7 +485,35 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A1000000000000000000000D /* Build configuration list for PBXNativeTarget "PinboardMCP" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000000000000000000000B /* Debug */,
+				A1000000000000000000000C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A1000000000000000000000E /* XCRemoteSwiftPackageReference "swift-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/modelcontextprotocol/swift-sdk.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.12.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1000000000000000000000F /* MCP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000000000000000000000E /* XCRemoteSwiftPackageReference "swift-sdk" */;
+			productName = MCP;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 12AF63C33040415E009C8856 /* Project object */;
 }

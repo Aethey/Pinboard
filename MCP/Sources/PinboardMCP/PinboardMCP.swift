@@ -135,13 +135,6 @@ private enum PinboardLauncher {
     }
 
     private static var applicationURL: URL? {
-        if let runningURL = NSRunningApplication
-            .runningApplications(withBundleIdentifier: bundleIdentifier)
-            .first(where: { !$0.isTerminated })?
-            .bundleURL {
-            return runningURL
-        }
-
         if let explicitPath = ProcessInfo.processInfo.environment["PINBOARD_APP_PATH"] {
             let explicitURL = URL(fileURLWithPath: explicitPath, isDirectory: true)
             if FileManager.default.fileExists(atPath: explicitURL.path) {
@@ -149,7 +142,36 @@ private enum PinboardLauncher {
             }
         }
 
+        if let embeddedApplicationURL {
+            return embeddedApplicationURL
+        }
+
+        if let runningURL = NSRunningApplication
+            .runningApplications(withBundleIdentifier: bundleIdentifier)
+            .first(where: { !$0.isTerminated })?
+            .bundleURL {
+            return runningURL
+        }
+
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+    }
+
+    private static var embeddedApplicationURL: URL? {
+        let executablePath = CommandLine.arguments[0]
+        var candidate = URL(fileURLWithPath: executablePath)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+            .deletingLastPathComponent()
+
+        while candidate.path != "/" {
+            if candidate.pathExtension == "app",
+               FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+            candidate.deleteLastPathComponent()
+        }
+
+        return nil
     }
 }
 
