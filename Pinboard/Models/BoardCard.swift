@@ -65,17 +65,6 @@ enum CardFontSize: Int, CaseIterable, Identifiable {
             "Large font"
         }
     }
-
-    var systemImage: String {
-        switch self {
-        case .small:
-            "textformat.size.smaller"
-        case .medium:
-            "textformat.size"
-        case .large:
-            "textformat.size.larger"
-        }
-    }
 }
 
 @Model
@@ -84,6 +73,7 @@ final class BoardCard {
     var kindRawValue: String
     var title: String
     var content: String
+    var boardID: UUID?
     @Attribute(.externalStorage) var imageData: Data?
     var imagePixelWidth: Double?
     var imagePixelHeight: Double?
@@ -105,6 +95,7 @@ final class BoardCard {
         kind: CardKind,
         title: String? = nil,
         content: String = "",
+        boardID: UUID? = nil,
         imageData: Data? = nil,
         imagePixelWidth: Double? = nil,
         imagePixelHeight: Double? = nil,
@@ -125,6 +116,7 @@ final class BoardCard {
         self.kindRawValue = kind.rawValue
         self.title = title ?? kind.title
         self.content = content
+        self.boardID = boardID
         self.imageData = imageData
         self.imagePixelWidth = imagePixelWidth
         self.imagePixelHeight = imagePixelHeight
@@ -176,7 +168,7 @@ final class BoardCard {
 }
 
 extension BoardCard {
-    static func welcomeCards() -> [BoardCard] {
+    static func welcomeCards(boardID: UUID? = nil) -> [BoardCard] {
         [
             BoardCard(
                 kind: .markdown,
@@ -188,6 +180,7 @@ extension BoardCard {
 
                 Press **⌥ Space** to switch between Board and Desktop modes.
                 """,
+                boardID: boardID,
                 positionX: 300,
                 positionY: 245,
                 width: 390,
@@ -199,6 +192,7 @@ extension BoardCard {
                 kind: .text,
                 title: "Interview notes",
                 content: "Keep the facts you need in sight.\n\n• Key numbers\n• Questions to ask\n• Short examples",
+                boardID: boardID,
                 positionX: 730,
                 positionY: 260,
                 width: 390,
@@ -210,6 +204,7 @@ extension BoardCard {
                 kind: .markdown,
                 title: "Desktop mode",
                 content: "Cards stay visible while the canvas becomes transparent. The window becomes click-through so it never blocks the app underneath.",
+                boardID: boardID,
                 positionX: 520,
                 positionY: 560,
                 width: 420,

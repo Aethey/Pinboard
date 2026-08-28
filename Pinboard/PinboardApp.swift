@@ -20,7 +20,11 @@ struct PinboardApp: App {
             ContentView()
                 .environment(session)
         }
-        .modelContainer(for: BoardCard.self, isAutosaveEnabled: true, isUndoEnabled: true)
+        .modelContainer(
+            for: [BoardCard.self, PinboardBoard.self],
+            isAutosaveEnabled: true,
+            isUndoEnabled: true
+        )
         .defaultSize(width: 1180, height: 780)
         .windowStyle(.hiddenTitleBar)
         .commands {

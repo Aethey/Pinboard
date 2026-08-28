@@ -43,6 +43,7 @@ struct BoardCardView: View {
             .frame(width: displayedSize.width, height: displayedSize.height)
             .background(cardSurfaceBackground)
             .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
             .overlay(selectionOutline)
             .overlay(alignment: .bottomTrailing) {
                 if mode == .board,
@@ -58,6 +59,7 @@ struct BoardCardView: View {
                 radius: card.kind == .image ? 12 : 16,
                 y: card.kind == .image ? 6 : 8
             )
+            .onHover { isHovering = $0 }
             .position(
                 x: CGFloat(card.positionX) + dragTranslation.width,
                 y: CGFloat(card.positionY) + dragTranslation.height
@@ -69,7 +71,6 @@ struct BoardCardView: View {
                     transaction.animation = nil
                 }
             }
-            .onHover { isHovering = $0 }
             .onAppear(perform: normalizeMinimumSize)
             .onChange(of: mode) { _, mode in
                 if mode != .board {
@@ -191,7 +192,7 @@ struct BoardCardView: View {
                             )
 
                             PinboardIconButton(
-                                systemImage: card.fontSize.systemImage,
+                                systemImage: "textformat.size",
                                 accessibilityLabel: card.fontSize.title,
                                 help: "Next font size",
                                 action: cycleFontSize
@@ -252,14 +253,20 @@ struct BoardCardView: View {
                     .padding(.bottom, 6)
                     .allowsHitTesting(mode == .board && !card.isLocked)
             } else {
-                ScrollView {
-                    MarkdownContentView(
-                        markdown: card.content,
-                        baseFontSize: card.fontSize.pointSize
-                    )
+                GeometryReader { geometry in
+                    let contentWidth = max(0, geometry.size.width - 20)
+
+                    ScrollView([.horizontal, .vertical]) {
+                        MarkdownContentView(
+                            markdown: card.content,
+                            baseFontSize: card.fontSize.pointSize,
+                            textWidth: contentWidth
+                        )
                         .textSelection(.enabled)
+                        .padding(10)
+                    }
+                    .scrollIndicators(.visible)
                 }
-                .contentMargins(10)
             }
 
         case .image:

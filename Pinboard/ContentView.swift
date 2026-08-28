@@ -14,10 +14,27 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(BoardSession.self) private var session
-    @Query(sort: \BoardCard.zIndex) private var cards: [BoardCard]
+    @Query(sort: \BoardCard.zIndex) private var allCards: [BoardCard]
+    @Query(sort: \PinboardBoard.sortOrder) private var boards: [PinboardBoard]
 
     @AppStorage("didCreateWelcomeCards") private var didCreateWelcomeCards = false
+    @AppStorage("activeBoardID") private var activeBoardIDString = ""
     @State private var isImportingImage = false
+    @State private var search = BoardSearchController()
+
+    private var activeBoardID: UUID? {
+        UUID(uuidString: activeBoardIDString)
+    }
+
+    private var activeBoard: PinboardBoard? {
+        guard let activeBoardID else { return boards.first }
+        return boards.first { $0.id == activeBoardID } ?? boards.first
+    }
+
+    private var cards: [BoardCard] {
+        guard let activeBoard else { return [] }
+        return allCards.filter { $0.boardID == activeBoard.id }
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -56,6 +73,8 @@ struct ContentView: View {
                         onDuplicate: { duplicate(card, canvasSize: geometry.size) },
                         onDelete: { delete(card) }
                     )
+                    .opacity(search.opacity(for: card.id))
+                    .animation(.easeOut(duration: 0.16), value: search.resolvedQuery)
                 }
 
                 if cards.isEmpty, session.mode == .board {
@@ -66,15 +85,25 @@ struct ContentView: View {
 
                 if session.mode == .board {
                     VStack {
-                        BoardToolbar(
-                            mode: session.mode,
-                            snapToGrid: session.snapToGrid,
-                            onAddText: { addCard(kind: .text, canvasSize: geometry.size) },
-                            onAddMarkdown: { addCard(kind: .markdown, canvasSize: geometry.size) },
-                            onImportImage: { isImportingImage = true },
-                            onToggleGrid: { session.snapToGrid.toggle() },
-                            onToggleMode: session.toggleMode
-                        )
+                        BoardSearchToolbar(
+                            search: search,
+                            onSelectResult: openSearchResult
+                        ) {
+                            BoardToolbar(
+                                mode: session.mode,
+                                snapToGrid: session.snapToGrid,
+                                activeBoard: activeBoard,
+                                boards: boards,
+                                onCreateBoard: createBoard,
+                                onSelectBoard: selectBoard,
+                                onRenameBoard: renameActiveBoard,
+                                onAddText: { addCard(kind: .text, canvasSize: geometry.size) },
+                                onAddMarkdown: { addCard(kind: .markdown, canvasSize: geometry.size) },
+                                onImportImage: { isImportingImage = true },
+                                onToggleGrid: { session.snapToGrid.toggle() },
+                                onToggleMode: session.toggleMode
+                            )
+                        }
 
                         Spacer()
                     }
@@ -98,7 +127,15 @@ struct ContentView: View {
         .background(WindowConfigurator(mode: session.mode))
         .onAppear {
             session.installGlobalHotKeyIfNeeded()
-            seedWelcomeCardsIfNeeded()
+            preparePersistentBoards()
+        }
+        .onChange(of: cards.map(\.updatedAt), initial: true) {
+            search.updateDocuments(from: cards)
+        }
+        .onChange(of: session.mode) { _, mode in
+            if mode != .board {
+                search.close()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .pinboardToggleMode)) { _ in
             session.toggleMode()
@@ -114,12 +151,79 @@ struct ContentView: View {
         return cards.first { $0.id == selectedCardID }
     }
 
-    private func seedWelcomeCardsIfNeeded() {
-        guard !didCreateWelcomeCards, cards.isEmpty else { return }
+    private func preparePersistentBoards() {
+        let board = resolvedInitialBoard()
 
-        BoardCard.welcomeCards().forEach(modelContext.insert)
-        didCreateWelcomeCards = true
+        for card in allCards where card.boardID == nil {
+            card.boardID = board.id
+        }
+
+        if !didCreateWelcomeCards, allCards.isEmpty {
+            BoardCard.welcomeCards(boardID: board.id).forEach(modelContext.insert)
+            didCreateWelcomeCards = true
+        }
+
+        activeBoardIDString = board.id.uuidString
         saveNow()
+    }
+
+    private func resolvedInitialBoard() -> PinboardBoard {
+        if let activeBoardID,
+           let board = boards.first(where: { $0.id == activeBoardID }) {
+            return board
+        }
+
+        if let board = boards.first {
+            return board
+        }
+
+        let board = PinboardBoard()
+        modelContext.insert(board)
+        return board
+    }
+
+    private func createBoard() {
+        let board = PinboardBoard(
+            name: nextBoardName,
+            sortOrder: (boards.map(\.sortOrder).max() ?? -1) + 1
+        )
+        modelContext.insert(board)
+        selectBoard(board)
+        saveNow()
+    }
+
+    private func selectBoard(_ board: PinboardBoard) {
+        search.close()
+        activeBoardIDString = board.id.uuidString
+        session.selectedCardID = nil
+    }
+
+    private func openSearchResult(_ result: BoardSearchResult) {
+        guard let card = cards.first(where: { $0.id == result.id }) else { return }
+        search.close()
+        activate(card)
+    }
+
+    private func renameActiveBoard(_ proposedName: String) {
+        guard let activeBoard else { return }
+
+        let trimmedName = proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
+        activeBoard.name = trimmedName.isEmpty
+            ? "Pinboard"
+            : String(trimmedName.prefix(80))
+        activeBoard.updatedAt = .now
+        saveNow()
+    }
+
+    private var nextBoardName: String {
+        let names = Set(boards.map { $0.name.lowercased() })
+        guard names.contains("pinboard") else { return "Pinboard" }
+
+        var number = 2
+        while names.contains("pinboard \(number)") {
+            number += 1
+        }
+        return "Pinboard \(number)"
     }
 
     private func addCard(
@@ -151,7 +255,11 @@ struct ContentView: View {
         _ request: BoardCardCreationRequest,
         canvasSize: CGSize
     ) {
-        if let existingCard = cards.first(where: { $0.id == request.id }) {
+        if let existingCard = allCards.first(where: { $0.id == request.id }) {
+            if let boardID = existingCard.boardID,
+               let board = boards.first(where: { $0.id == boardID }) {
+                selectBoard(board)
+            }
             activate(existingCard)
             return
         }
@@ -167,6 +275,7 @@ struct ContentView: View {
             kind: request.kind,
             title: request.title,
             content: request.content,
+            boardID: activeBoard?.id,
             positionX: position.x,
             positionY: position.y,
             width: cardSize.width,
@@ -191,6 +300,7 @@ struct ContentView: View {
         let card = BoardCard(
             kind: .image,
             title: "Image",
+            boardID: activeBoard?.id,
             imageData: data,
             imagePixelWidth: pixelSize.width,
             imagePixelHeight: pixelSize.height,
@@ -242,6 +352,7 @@ struct ContentView: View {
             kind: card.kind,
             title: card.title,
             content: card.content,
+            boardID: card.boardID,
             imageData: card.imageData,
             imagePixelWidth: card.imagePixelWidth,
             imagePixelHeight: card.imagePixelHeight,
@@ -391,6 +502,6 @@ private struct ImageMetadata {
 #Preview {
     ContentView()
         .environment(BoardSession())
-        .modelContainer(for: BoardCard.self, inMemory: true)
+        .modelContainer(for: [BoardCard.self, PinboardBoard.self], inMemory: true)
         .frame(width: 1120, height: 760)
 }

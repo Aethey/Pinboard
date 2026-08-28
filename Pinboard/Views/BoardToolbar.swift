@@ -8,11 +8,20 @@ import SwiftUI
 struct BoardToolbar: View {
     let mode: BoardMode
     let snapToGrid: Bool
+    let activeBoard: PinboardBoard?
+    let boards: [PinboardBoard]
+    let onCreateBoard: () -> Void
+    let onSelectBoard: (PinboardBoard) -> Void
+    let onRenameBoard: (String) -> Void
     let onAddText: () -> Void
     let onAddMarkdown: () -> Void
     let onImportImage: () -> Void
     let onToggleGrid: () -> Void
     let onToggleMode: () -> Void
+
+    @State private var isEditingBoardName = false
+    @State private var boardNameDraft = ""
+    @FocusState private var isBoardNameFocused: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -58,22 +67,125 @@ struct BoardToolbar: View {
         .font(.system(size: 13, weight: .medium))
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay {
-            Capsule()
-                .stroke(.white.opacity(0.12), lineWidth: 1)
+        .onChange(of: activeBoard?.id) {
+            isEditingBoardName = false
+            isBoardNameFocused = false
+            boardNameDraft = activeBoard?.name ?? "Pinboard"
         }
-        .shadow(color: .black.opacity(0.28), radius: 20, y: 10)
+        .onChange(of: isBoardNameFocused) { wasFocused, isFocused in
+            if wasFocused, !isFocused {
+                commitBoardName()
+            }
+        }
     }
 
     private var brand: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 6) {
             Image(systemName: "pin.fill")
                 .foregroundStyle(PinboardTheme.selection)
-            Text("Pinboard")
-                .fontWeight(.semibold)
+
+            HStack(spacing: 2) {
+                boardName
+
+                if activeBoard != nil {
+                    boardControl
+                }
+            }
         }
-        .padding(.horizontal, 4)
+        .padding(.leading, 4)
+    }
+
+    @ViewBuilder
+    private var boardName: some View {
+        if isEditingBoardName {
+            TextField("Board name", text: $boardNameDraft)
+                .textFieldStyle(.plain)
+                .fontWeight(.semibold)
+                .focused($isBoardNameFocused)
+                .onSubmit(commitBoardName)
+                .onExitCommand(perform: cancelBoardNameEditing)
+                .frame(width: 104, alignment: .leading)
+        } else {
+            Text(activeBoard?.name ?? "Pinboard")
+                .fontWeight(.semibold)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2, perform: beginBoardNameEditing)
+                .help("Double-click to rename Board")
+        }
+    }
+
+    @ViewBuilder
+    private var boardControl: some View {
+        if boards.count <= 1 {
+            PinboardIconButton(
+                systemImage: "rectangle.stack.badge.plus",
+                accessibilityLabel: "New Board",
+                help: "New Board",
+                size: PinboardTheme.Controls.toolbarButtonSize,
+                glyphSize: PinboardTheme.Controls.toolbarGlyphSize,
+                action: onCreateBoard
+            )
+        } else {
+            Menu {
+                ForEach(boards) { board in
+                    Button {
+                        onSelectBoard(board)
+                    } label: {
+                        if board.id == activeBoard?.id {
+                            Label(board.name, systemImage: "checkmark")
+                        } else {
+                            Text(board.name)
+                        }
+                    }
+                }
+
+                Divider()
+
+                Button(action: onCreateBoard) {
+                    Label("New Board", systemImage: "plus")
+                }
+            } label: {
+                Image(systemName: "rectangle.stack")
+                    .symbolRenderingMode(.monochrome)
+                    .font(.system(
+                        size: PinboardTheme.Controls.toolbarGlyphSize,
+                        weight: .medium
+                    ))
+                    .frame(
+                        width: PinboardTheme.Controls.toolbarButtonSize,
+                        height: PinboardTheme.Controls.toolbarButtonSize
+                    )
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .foregroundStyle(.primary.opacity(0.72))
+            .accessibilityLabel("Switch Board")
+            .help("Switch Board")
+        }
+    }
+
+    private func beginBoardNameEditing() {
+        guard let activeBoard else { return }
+        boardNameDraft = activeBoard.name
+        isEditingBoardName = true
+        isBoardNameFocused = true
+    }
+
+    private func commitBoardName() {
+        guard isEditingBoardName else { return }
+        onRenameBoard(boardNameDraft)
+        isEditingBoardName = false
+        isBoardNameFocused = false
+    }
+
+    private func cancelBoardNameEditing() {
+        isEditingBoardName = false
+        isBoardNameFocused = false
+        boardNameDraft = activeBoard?.name ?? "Pinboard"
     }
 
     private func kindButton(_ kind: CardKind, action: @escaping () -> Void) -> some View {
