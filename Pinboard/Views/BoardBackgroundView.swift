@@ -12,27 +12,25 @@ struct BoardBackgroundView: View {
 
     var body: some View {
         ZStack {
-            if mode == .board {
-                LinearGradient(
-                    colors: [PinboardTheme.canvasTop, PinboardTheme.canvasBottom],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+            LinearGradient(
+                colors: [PinboardTheme.canvasTop, PinboardTheme.canvasBottom],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
 
-                RadialGradient(
-                    colors: [Color.indigo.opacity(0.10), .clear],
-                    center: .topLeading,
-                    startRadius: 20,
-                    endRadius: 720
-                )
+            RadialGradient(
+                colors: [Color.indigo.opacity(0.10), .clear],
+                center: .topLeading,
+                startRadius: 20,
+                endRadius: 720
+            )
 
-                if showsGrid {
-                    GridPattern(spacing: gridSize)
-                }
-            } else {
-                Color.clear
+            if showsGrid {
+                GridPattern(spacing: gridSize)
             }
         }
+        .opacity(mode == .board ? 1 : 0)
+        .animation(.easeInOut(duration: 0.28), value: mode)
         .ignoresSafeArea()
     }
 }
@@ -60,4 +58,3 @@ private struct GridPattern: View {
         .allowsHitTesting(false)
     }
 }
-

@@ -15,33 +15,30 @@ struct BoardToolbar: View {
     let onToggleMode: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             brand
 
             Divider()
                 .frame(height: 22)
 
-            toolbarButton("Text", action: onAddText) {
-                CardKindIcon(kind: .text)
-            }
-            toolbarButton("Markdown", action: onAddMarkdown) {
-                CardKindIcon(kind: .markdown)
-            }
-            toolbarButton("Image", action: onImportImage) {
-                Image(systemName: "photo.badge.plus")
-                    .frame(width: 18, height: 18)
+            HStack(spacing: 2) {
+                kindButton(.text, action: onAddText)
+                kindButton(.markdown, action: onAddMarkdown)
+                kindButton(.image, action: onImportImage)
             }
 
             Divider()
                 .frame(height: 22)
 
-            Button(action: onToggleGrid) {
-                Image(systemName: snapToGrid ? "grid.circle.fill" : "grid.circle")
-                    .frame(width: 18, height: 18)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(snapToGrid ? PinboardTheme.selection : .secondary)
-            .help(snapToGrid ? "Disable grid snapping" : "Enable grid snapping")
+            PinboardIconButton(
+                systemImage: "square.grid.3x3",
+                accessibilityLabel: snapToGrid ? "Disable grid snapping" : "Enable grid snapping",
+                help: snapToGrid ? "Disable grid snapping" : "Enable grid snapping",
+                emphasis: snapToGrid ? .active : .standard,
+                size: PinboardTheme.Controls.toolbarButtonSize,
+                glyphSize: PinboardTheme.Controls.toolbarGlyphSize,
+                action: onToggleGrid
+            )
 
             Button(action: onToggleMode) {
                 HStack(spacing: 7) {
@@ -79,16 +76,23 @@ struct BoardToolbar: View {
         .padding(.horizontal, 4)
     }
 
-    private func toolbarButton<Icon: View>(
-        _ title: String,
-        action: @escaping () -> Void,
-        @ViewBuilder icon: () -> Icon
-    ) -> some View {
+    private func kindButton(_ kind: CardKind, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            icon()
-                .frame(width: 18, height: 18)
+            CardKindIcon(
+                kind: kind,
+                size: PinboardTheme.Controls.toolbarKindIconSize,
+                backgroundColor: .primary.opacity(0.07),
+                foregroundColor: .primary.opacity(0.82),
+                borderColor: .primary.opacity(0.16)
+            )
+            .frame(
+                width: PinboardTheme.Controls.toolbarButtonSize,
+                height: PinboardTheme.Controls.toolbarButtonSize
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("New \(title) card")
+        .accessibilityLabel("New \(kind.title) card")
+        .help("New \(kind.title) card")
     }
 }

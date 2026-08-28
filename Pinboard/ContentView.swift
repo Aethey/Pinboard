@@ -83,8 +83,6 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .animation(.snappy(duration: 0.25), value: session.selectedCardID)
-            .animation(.easeInOut(duration: 0.28), value: session.mode)
             .fileImporter(
                 isPresented: $isImportingImage,
                 allowedContentTypes: [.image],
@@ -251,8 +249,10 @@ struct ContentView: View {
             positionY: min(card.positionY + 28, height - card.height / 2),
             width: card.width,
             height: card.height,
-            opacity: card.opacity,
+            opacity: 1,
             theme: card.theme,
+            fontSize: card.fontSize,
+            isCollapsed: card.isCollapsed,
             zIndex: nextZIndex
         )
 

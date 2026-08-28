@@ -23,7 +23,7 @@ struct BoardCardView: View {
 
     @State private var isHovering = false
     @State private var showsMarkdownPreview = true
-    @State private var showsQuickControls = false
+    @State private var isEditingTitle = false
     @FocusState private var focusedField: FocusedField?
     @GestureState private var dragTranslation = CGSize.zero
     @GestureState private var resizeTranslation = CGSize.zero
@@ -32,9 +32,9 @@ struct BoardCardView: View {
 
     private let noteMinimumWidth: Double = 300
     private let noteMinimumHeight: Double = 120
+    private let noteTitleBarHeight = PinboardTheme.Controls.cardHeaderHeight
     private let imageMinimumWidth: Double = 80
     private let quickThemes: [CardTheme] = [.indigo, .teal, .amber, .rose]
-    private let opacitySteps: [Double] = [1.0, 0.85, 0.70, 0.55]
 
     var body: some View {
         let displayedSize = displayedCardSize
@@ -47,16 +47,17 @@ struct BoardCardView: View {
             .overlay(alignment: .bottomTrailing) {
                 if mode == .board,
                    !card.isLocked,
-                   card.kind == .image ? isHovering : (isSelected || isHovering) {
+                   card.kind == .image
+                       ? isHovering
+                       : (!card.isCollapsed && (isSelected || isHovering)) {
                     resizeHandle
                 }
             }
             .shadow(
                 color: .black.opacity(mode == .board ? 0.30 : 0.18),
-                radius: card.kind == .image ? 12 : (mode == .board ? 16 : 10),
-                y: card.kind == .image ? 6 : (mode == .board ? 8 : 5)
+                radius: card.kind == .image ? 12 : 16,
+                y: card.kind == .image ? 6 : 8
             )
-            .opacity(card.opacity)
             .position(
                 x: CGFloat(card.positionX) + dragTranslation.width,
                 y: CGFloat(card.positionY) + dragTranslation.height
@@ -72,16 +73,21 @@ struct BoardCardView: View {
             .onAppear(perform: normalizeMinimumSize)
             .onChange(of: mode) { _, mode in
                 if mode != .board {
-                    showsQuickControls = false
+                    isEditingTitle = false
                     focusedField = nil
                 }
             }
-            .onChange(of: focusedField) { _, focusedField in
-                guard focusedField != nil else { return }
-                activateCard()
+            .onChange(of: focusedField) { oldValue, newValue in
+                if oldValue == .title, newValue != .title {
+                    isEditingTitle = false
+                }
+                if newValue != nil {
+                    activateCard()
+                }
             }
             .onChange(of: isSelected) { _, isSelected in
                 if !isSelected {
+                    isEditingTitle = false
                     focusedField = nil
                 }
             }
@@ -96,14 +102,22 @@ struct BoardCardView: View {
             .contextMenu {
                 if mode == .board {
                     Button(card.isLocked ? "Unlock" : "Lock", action: toggleLock)
+                    if card.kind != .image {
+                        Button(card.isCollapsed ? "Expand" : "Collapse", action: toggleCollapsed)
+                    }
+                    if card.kind == .markdown, !card.isCollapsed, !card.isLocked {
+                        Button(
+                            showsMarkdownPreview ? "Edit Markdown Source" : "Preview Markdown",
+                            action: toggleMarkdownPreview
+                        )
+                    }
                     Button("Duplicate", action: onDuplicate)
                     Divider()
                     Button("Delete", role: .destructive, action: onDelete)
                 }
             }
-            .animation(.snappy(duration: 0.22), value: isSelected)
             .animation(.snappy(duration: 0.18), value: isHovering)
-            .animation(.easeInOut(duration: 0.25), value: mode)
+            .animation(.snappy(duration: 0.22), value: card.isCollapsed)
     }
 
     @ViewBuilder
@@ -113,133 +127,136 @@ struct BoardCardView: View {
         } else {
             VStack(spacing: 0) {
                 cardHeader
-                cardContent
-                    .contentShape(Rectangle())
+                if !card.isCollapsed {
+                    cardContent
+                        .contentShape(Rectangle())
+                }
             }
         }
     }
 
     private var cardHeader: some View {
-        HStack(spacing: 6) {
-            CardKindIcon(kind: card.kind, size: 14)
-                .foregroundStyle(card.theme.color)
+        HStack(spacing: 7) {
+            CardKindIcon(
+                kind: card.kind,
+                size: PinboardTheme.Controls.cardIconSize,
+                backgroundColor: card.theme.color,
+                foregroundColor: card.theme.highContrastForeground,
+                borderColor: card.theme.highContrastForeground.opacity(0.24)
+            )
+            .help(card.isLocked ? "Card locked" : "Drag card")
 
-            if mode == .board, !card.isLocked {
+            if mode == .board, !card.isLocked, isEditingTitle {
                 TextField("Card title", text: binding(for: \BoardCard.title))
                     .textFieldStyle(.plain)
                     .font(.system(size: 11, weight: .semibold))
                     .focused($focusedField, equals: .title)
+                    .onSubmit {
+                        finishTitleEditing()
+                    }
             } else {
                 Text(card.title)
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2, perform: beginTitleEditing)
+                    .help(card.isLocked ? "Card locked" : "Double-click to edit title")
             }
 
             Spacer(minLength: 2)
 
-            if card.kind == .markdown,
-               mode == .board,
-               !card.isLocked,
-               !showsQuickControls {
-                Button {
-                    activateCard()
-                    showsMarkdownPreview.toggle()
-                } label: {
-                    Image(
-                        systemName: showsMarkdownPreview
-                            ? "chevron.left.forwardslash.chevron.right"
-                            : "doc.richtext"
-                    )
-                }
-                .buttonStyle(.plain)
-                .help(showsMarkdownPreview ? "Edit Markdown" : "Preview Markdown")
-            }
-
             if mode == .board {
-                if showsQuickControls {
-                    HStack(spacing: 6) {
-                        Button(action: cycleTheme) {
-                            Image(systemName: "paintpalette.fill")
-                        }
-                        .help("Next color")
+                HStack(spacing: 4) {
+                    if !card.isCollapsed, !card.isLocked {
+                        HStack(spacing: 0) {
+                            if card.kind == .markdown {
+                                PinboardIconButton(
+                                    systemImage: showsMarkdownPreview ? "pencil" : "eye",
+                                    accessibilityLabel: showsMarkdownPreview
+                                        ? "Edit Markdown"
+                                        : "Show Markdown preview",
+                                    help: showsMarkdownPreview
+                                        ? "Edit Markdown"
+                                        : "Show Markdown preview",
+                                    emphasis: showsMarkdownPreview ? .standard : .active,
+                                    action: toggleMarkdownPreview
+                                )
+                            }
 
-                        Button(action: cycleOpacity) {
-                            Image(systemName: "circle.lefthalf.filled")
-                                .foregroundStyle(.primary.opacity(opacityIndicatorStrength))
-                                .frame(width: 14)
-                        }
-                        .accessibilityLabel("Opacity level \(opacityLevel) of 4")
-                        .help("Next opacity")
+                            PinboardIconButton(
+                                systemImage: "paintpalette",
+                                accessibilityLabel: "Next color",
+                                help: "Next color",
+                                action: cycleTheme
+                            )
 
-                        Button(role: .destructive, action: onDelete) {
-                            Image(systemName: "trash")
+                            PinboardIconButton(
+                                systemImage: card.fontSize.systemImage,
+                                accessibilityLabel: card.fontSize.title,
+                                help: "Next font size",
+                                action: cycleFontSize
+                            )
                         }
-                        .foregroundStyle(.primary.opacity(0.52))
-                        .help("Delete card")
                     }
-                    .buttonStyle(.plain)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-                }
 
-                Button {
-                    activateCard()
-                    showsQuickControls.toggle()
-                } label: {
-                    Image(systemName: showsQuickControls ? "xmark.circle.fill" : "pencil.circle")
-                }
-                .buttonStyle(.plain)
-                .help(showsQuickControls ? "Hide card controls" : "Show card controls")
+                    HStack(spacing: 0) {
+                        PinboardIconButton(
+                            systemImage: card.isLocked ? "lock" : "lock.open",
+                            accessibilityLabel: card.isLocked ? "Unlock card" : "Lock card",
+                            help: card.isLocked ? "Unlock card" : "Lock card",
+                            emphasis: card.isLocked ? .active : .standard,
+                            action: toggleLock
+                        )
 
-                Button(action: toggleLock) {
-                    Image(systemName: card.isLocked ? "lock.fill" : "lock.open")
+                        PinboardIconButton(
+                            systemImage: "trash",
+                            accessibilityLabel: "Delete card",
+                            help: "Delete card",
+                            emphasis: .destructive,
+                            action: onDelete
+                        )
+
+                        PinboardIconButton(
+                            systemImage: card.isCollapsed ? "chevron.down" : "chevron.up",
+                            accessibilityLabel: card.isCollapsed ? "Expand card" : "Collapse card",
+                            help: card.isCollapsed ? "Expand card" : "Collapse card",
+                            action: toggleCollapsed
+                        )
+                    }
                 }
-                .buttonStyle(.plain)
-                .help(card.isLocked ? "Unlock card" : "Lock card")
             }
         }
         .font(.system(size: 11))
         .foregroundStyle(.primary.opacity(0.84))
         .padding(.horizontal, 9)
-        .frame(height: mode == .board ? 30 : 26)
+        .frame(height: noteTitleBarHeight)
         .background(.white.opacity(mode == .board ? 0.028 : 0.016))
         .contentShape(Rectangle())
-        .gesture(dragGesture)
-        .animation(.snappy(duration: 0.22), value: showsQuickControls)
+        .simultaneousGesture(dragGesture)
+        .animation(.snappy(duration: 0.22), value: card.isCollapsed)
     }
 
     @ViewBuilder
     private var cardContent: some View {
         switch card.kind {
         case .text:
-            if mode == .board, !card.isLocked {
-                TextEditor(text: binding(for: \BoardCard.content))
-                    .font(.system(size: 14))
-                    .scrollContentBackground(.hidden)
-                    .focused($focusedField, equals: .content)
-                    .padding(.horizontal, 6)
-                    .padding(.bottom, 6)
-            } else {
-                ScrollView {
-                    Text(card.content.isEmpty ? "Empty note" : card.content)
-                        .font(.system(size: 14))
-                        .foregroundStyle(card.content.isEmpty ? .tertiary : .primary)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                        .textSelection(.enabled)
-                }
-                .contentMargins(10)
-            }
+            textCardContent
 
         case .markdown:
-            if mode == .board, !card.isLocked, !showsMarkdownPreview {
+            if !showsMarkdownPreview {
                 TextEditor(text: binding(for: \BoardCard.content))
-                    .font(.system(size: 13, design: .monospaced))
+                    .font(.system(size: card.fontSize.pointSize, design: .monospaced))
                     .scrollContentBackground(.hidden)
                     .focused($focusedField, equals: .content)
                     .padding(.horizontal, 6)
                     .padding(.bottom, 6)
+                    .allowsHitTesting(mode == .board && !card.isLocked)
             } else {
                 ScrollView {
-                    MarkdownContentView(markdown: card.content)
+                    MarkdownContentView(
+                        markdown: card.content,
+                        baseFontSize: card.fontSize.pointSize
+                    )
                         .textSelection(.enabled)
                 }
                 .contentMargins(10)
@@ -250,27 +267,57 @@ struct BoardCardView: View {
         }
     }
 
+    private var textCardContent: some View {
+        ZStack(alignment: .topLeading) {
+            TextEditor(text: binding(for: \BoardCard.content))
+                .font(.system(size: card.fontSize.pointSize))
+                .scrollContentBackground(.hidden)
+                .focused($focusedField, equals: .content)
+                .allowsHitTesting(mode == .board && !card.isLocked)
+
+            if card.content.isEmpty {
+                Text("Empty note")
+                    .font(.system(size: card.fontSize.pointSize))
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, 5)
+                    .padding(.top, 1)
+                    .allowsHitTesting(false)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.bottom, 6)
+    }
+
     private var imageCardSurface: some View {
         ZStack(alignment: .top) {
             imageContent
 
             if mode == .board, isHovering {
                 HStack(spacing: 6) {
-                    Image(systemName: card.isLocked ? "lock.fill" : "line.3.horizontal")
-                        .frame(width: 24, height: 20)
+                    Image(
+                        systemName: card.isLocked
+                            ? "lock"
+                            : "arrow.up.and.down.and.arrow.left.and.right"
+                    )
+                        .symbolRenderingMode(.monochrome)
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(
+                            width: PinboardTheme.Controls.cardButtonSize,
+                            height: PinboardTheme.Controls.cardButtonSize
+                        )
                         .contentShape(Rectangle())
                         .gesture(dragGesture)
                         .help(card.isLocked ? "Card locked" : "Drag image")
 
                     Spacer(minLength: 8)
 
-                    Button(role: .destructive, action: onDelete) {
-                        Image(systemName: "trash")
-                            .frame(width: 22, height: 20)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.primary.opacity(0.52))
-                    .help("Delete image")
+                    PinboardIconButton(
+                        systemImage: "trash",
+                        accessibilityLabel: "Delete image",
+                        help: "Delete image",
+                        emphasis: .destructive,
+                        action: onDelete
+                    )
                 }
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.primary.opacity(0.88))
@@ -328,24 +375,22 @@ struct BoardCardView: View {
 
     @ViewBuilder
     private var selectionOutline: some View {
-        if mode == .board {
-            if card.kind == .image {
-                if isHovering {
-                    RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
-                        .stroke(
-                            isSelected ? PinboardTheme.selection : .white.opacity(0.32),
-                            lineWidth: isSelected ? 1.25 : 0.75
-                        )
-                }
-            } else {
+        if card.kind == .image {
+            if mode == .board, isHovering {
                 RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
                     .stroke(
-                        isSelected
-                            ? PinboardTheme.selection
-                            : .white.opacity(isHovering ? 0.17 : 0.09),
-                        lineWidth: isSelected ? 1.25 : 1
+                        isSelected ? PinboardTheme.selection : .white.opacity(0.32),
+                        lineWidth: isSelected ? 1.25 : 0.75
                     )
             }
+        } else {
+            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                .stroke(
+                    mode == .board && isSelected
+                        ? PinboardTheme.selection
+                        : .white.opacity(mode == .board && isHovering ? 0.17 : 0.09),
+                    lineWidth: mode == .board && isSelected ? 1.25 : 1
+                )
         }
     }
 
@@ -390,7 +435,9 @@ struct BoardCardView: View {
 
         return CGSize(
             width: max(noteMinimumWidth, card.width + Double(resizeTranslation.width)),
-            height: max(noteMinimumHeight, card.height + Double(resizeTranslation.height))
+            height: card.isCollapsed
+                ? noteTitleBarHeight
+                : max(noteMinimumHeight, card.height + Double(resizeTranslation.height))
         )
     }
 
@@ -409,8 +456,9 @@ struct BoardCardView: View {
 
                 let proposedX = card.positionX + Double(value.translation.width)
                 let proposedY = card.positionY + Double(value.translation.height)
-                let halfWidth = card.width / 2
-                let halfHeight = card.height / 2
+                let displayedSize = displayedCardSize
+                let halfWidth = Double(displayedSize.width) / 2
+                let halfHeight = Double(displayedSize.height) / 2
                 let maximumX = max(halfWidth, Double(canvasSize.width) - halfWidth)
                 let maximumY = max(halfHeight, Double(canvasSize.height) - halfHeight)
 
@@ -483,30 +531,63 @@ struct BoardCardView: View {
         card.updatedAt = .now
     }
 
-    private var opacityLevel: Int {
-        let closestIndex = opacitySteps.indices.min {
-            abs(opacitySteps[$0] - card.opacity) < abs(opacitySteps[$1] - card.opacity)
-        } ?? 0
-        return closestIndex + 1
-    }
-
-    private var opacityIndicatorStrength: Double {
-        [1.0, 0.82, 0.64, 0.46][opacityLevel - 1]
-    }
-
-    private func cycleOpacity() {
+    private func cycleFontSize() {
         activateCard()
-        let currentIndex = opacitySteps.indices.min {
-            abs(opacitySteps[$0] - card.opacity) < abs(opacitySteps[$1] - card.opacity)
-        } ?? 0
-        card.opacity = opacitySteps[(currentIndex + 1) % opacitySteps.count]
+        let sizes = CardFontSize.allCases
+        let currentIndex = sizes.firstIndex(of: card.fontSize) ?? 0
+        card.fontSize = sizes[(currentIndex + 1) % sizes.count]
         card.updatedAt = .now
+    }
+
+    private func toggleCollapsed() {
+        activateCard()
+        guard card.kind != .image else { return }
+
+        isEditingTitle = false
+        focusedField = nil
+
+        let heightDifference = max(0, card.height - Double(noteTitleBarHeight)) / 2
+        if card.isCollapsed {
+            card.positionY += heightDifference
+            card.isCollapsed = false
+            clampCardPosition(width: card.width, height: card.height)
+        } else {
+            card.positionY -= heightDifference
+            card.isCollapsed = true
+            clampCardPosition(width: card.width, height: Double(noteTitleBarHeight))
+        }
+        card.updatedAt = .now
+    }
+
+    private func toggleMarkdownPreview() {
+        activateCard()
+        showsMarkdownPreview.toggle()
+        if showsMarkdownPreview {
+            focusedField = nil
+        } else {
+            focusedField = .content
+        }
+    }
+
+    private func beginTitleEditing() {
+        guard mode == .board, !card.isLocked else { return }
+        activateCard()
+        isEditingTitle = true
+        Task { @MainActor in
+            focusedField = .title
+        }
+    }
+
+    private func finishTitleEditing() {
+        isEditingTitle = false
+        focusedField = nil
     }
 
     private func toggleLock() {
         activateCard()
         card.isLocked.toggle()
         if card.isLocked {
+            isEditingTitle = false
             focusedField = nil
         }
         card.updatedAt = .now
@@ -540,11 +621,17 @@ struct BoardCardView: View {
             return
         }
 
-        guard card.width < noteMinimumWidth || card.height < noteMinimumHeight else { return }
+        let needsSizeUpdate = card.width < noteMinimumWidth || card.height < noteMinimumHeight
+        let needsOpacityReset = card.opacity != 1
+        guard needsSizeUpdate || needsOpacityReset else { return }
 
         card.width = max(noteMinimumWidth, card.width)
         card.height = max(noteMinimumHeight, card.height)
-        clampCardPosition(width: card.width, height: card.height)
+        card.opacity = 1
+        clampCardPosition(
+            width: card.width,
+            height: card.isCollapsed ? Double(noteTitleBarHeight) : card.height
+        )
         card.updatedAt = .now
     }
 

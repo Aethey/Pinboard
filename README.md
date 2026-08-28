@@ -18,7 +18,8 @@ Pinboard gives text, Markdown, and images a permanent place on a free-form canva
 - **Three card types:** plain text, rendered Markdown, and images.
 - **Create where you think:** double-click an empty place to create a text note there. Near an edge, Pinboard automatically places the card on the side where it fits.
 - **A spatial canvas:** drag, resize, duplicate, lock, or delete cards. The card you click moves to the front.
-- **Compact controls:** use the pencil button to reveal color, opacity, and delete controls without opening a separate editor.
+- **Dense title-bar controls:** change color, cycle through three font sizes, collapse, delete, or lock a note directly from its title bar. The largest font is twice the size of the smallest.
+- **Collapsible notes:** collapse a text or Markdown note to its title bar and expand it again whenever you need the content.
 - **Better images:** Pinboard reads an image's dimensions before adding it and keeps its original aspect ratio while resizing. Image controls appear only while that image is hovered.
 - **Markdown preview:** switch between Markdown source and rendered content inside the card.
 - **Board and Desktop modes:** press `⌥ Space` to switch modes. Desktop mode is floating and click-through, so notes stay visible without blocking other apps.
@@ -54,11 +55,13 @@ The helper is also included automatically when you Archive or export the app. Us
 | Create a text note | Double-click the board, or use the Text button |
 | Create Markdown | Use the Markdown button |
 | Add an image | Use the Image button and choose a local image |
-| Move a note | Drag its small title bar |
+| Move a note | Press and drag anywhere on its title bar |
 | Move an image | Hover the image, then drag the handle at the top-left |
 | Resize a card | Drag the handle at the bottom-right |
-| Change color or opacity | Click the pencil button, then use the compact controls |
-| Lock, duplicate, or delete | Right-click a card |
+| Edit a note title | Double-click the title text |
+| Change color or font size | Use the palette or font-size button in the title bar |
+| Collapse or expand a note | Use the chevron button in the title bar |
+| Lock or delete | Use the title-bar buttons; right-click to duplicate |
 | Bring a card to the front | Click or edit that card |
 | Switch Board/Desktop mode | Press `⌥ Space` |
 | Maximize the window | Double-click the top edge of the window |
@@ -175,7 +178,8 @@ Pinboard 把文本、Markdown 和图片放进一张可以自由排列的画布�
 - **三种便签：** 普通文本、可渲染的 Markdown 和图片。
 - **双击即创建：** 双击画布空白处，就会在该位置创建文本便签。如果靠近边缘，Pinboard 会自动换到放得下的一侧。
 - **自由布局：** 便签可以移动、缩放、复制、锁定和删除。点击任何便签，它都会来到最上层。
-- **紧凑控制栏：** 点击铅笔按钮，会显示颜色、透明度和删除按钮，不再弹出额外的编辑窗口。
+- **高密度标题栏：** 可以直接修改颜色、循环切换三档字体、折叠、删除或锁定；最大字号是最小字号的两倍。
+- **便签折叠：** 文本和 Markdown 便签可以只保留标题栏，需要时再展开内容。
 - **图片保持比例：** 导入前会读取图片尺寸；创建和缩放时都会保持原图比例。只有鼠标移入当前图片时，才显示它的边框和操作按钮。
 - **Markdown 预览：** 可以在 Markdown 源码和渲染结果之间切换。
 - **Board / Desktop 模式：** 按 `⌥ Space` 切换。Desktop 模式会悬浮显示并穿透鼠标，不会挡住其他应用的操作。
@@ -211,11 +215,13 @@ Pinboard.app/Contents/MacOS/pinboard-mcp
 | 创建文本便签 | 双击画布，或点击 Text 按钮 |
 | 创建 Markdown | 点击 Markdown 按钮 |
 | 添加图片 | 点击 Image 按钮并选择本地图片 |
-| 移动文本便签 | 拖动窄标题栏 |
+| 移动文本便签 | 按住标题栏任意位置拖动 |
 | 移动图片 | 鼠标移入图片后，拖动左上角把手 |
 | 缩放便签 | 拖动右下角把手 |
-| 修改颜色或透明度 | 点击铅笔按钮，再点击对应图标 |
-| 锁定、复制或删除 | 右键点击便签 |
+| 编辑标题 | 双击标题文字 |
+| 修改颜色或字体大小 | 点击标题栏中的调色板或字号图标 |
+| 折叠或展开 | 点击标题栏中的箭头按钮 |
+| 锁定或删除 | 使用标题栏按钮；右键可以复制 |
 | 把便签移到最上层 | 点击或编辑该便签 |
 | 切换 Board / Desktop | 按 `⌥ Space` |
 | 最大化窗口 | 双击窗口上边缘 |

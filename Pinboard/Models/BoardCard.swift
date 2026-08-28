@@ -37,6 +37,47 @@ enum CardTheme: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum CardFontSize: Int, CaseIterable, Identifiable {
+    case small
+    case medium
+    case large
+
+    var id: Int { rawValue }
+
+    var pointSize: CGFloat {
+        switch self {
+        case .small:
+            12
+        case .medium:
+            18
+        case .large:
+            24
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .small:
+            "Small font"
+        case .medium:
+            "Medium font"
+        case .large:
+            "Large font"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .small:
+            "textformat.size.smaller"
+        case .medium:
+            "textformat.size"
+        case .large:
+            "textformat.size.larger"
+        }
+    }
+}
+
 @Model
 final class BoardCard {
     @Attribute(.unique) var id: UUID
@@ -52,6 +93,8 @@ final class BoardCard {
     var height: Double
     var opacity: Double
     var themeRawValue: String
+    var fontSizeRawValue: Int = CardFontSize.medium.rawValue
+    var isCollapsed: Bool = false
     var zIndex: Int
     var isLocked: Bool
     var createdAt: Date
@@ -69,8 +112,10 @@ final class BoardCard {
         positionY: Double = 260,
         width: Double = 390,
         height: Double = 240,
-        opacity: Double = 0.94,
+        opacity: Double = 1,
         theme: CardTheme = .graphite,
+        fontSize: CardFontSize = .medium,
+        isCollapsed: Bool = false,
         zIndex: Int = 0,
         isLocked: Bool = false,
         createdAt: Date = .now,
@@ -89,6 +134,8 @@ final class BoardCard {
         self.height = height
         self.opacity = opacity
         self.themeRawValue = theme.rawValue
+        self.fontSizeRawValue = fontSize.rawValue
+        self.isCollapsed = isCollapsed
         self.zIndex = zIndex
         self.isLocked = isLocked
         self.createdAt = createdAt
@@ -103,6 +150,11 @@ final class BoardCard {
     var theme: CardTheme {
         get { CardTheme(rawValue: themeRawValue) ?? .graphite }
         set { themeRawValue = newValue.rawValue }
+    }
+
+    var fontSize: CardFontSize {
+        get { CardFontSize(rawValue: fontSizeRawValue) ?? .medium }
+        set { fontSizeRawValue = newValue.rawValue }
     }
 
     var image: NSImage? {

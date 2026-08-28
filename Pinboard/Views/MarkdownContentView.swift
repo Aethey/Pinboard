@@ -7,6 +7,7 @@ import SwiftUI
 
 struct MarkdownContentView: View {
     let markdown: String
+    var baseFontSize: CGFloat = 18
 
     private var lines: [MarkdownLine] {
         markdown
@@ -21,6 +22,7 @@ struct MarkdownContentView: View {
                 lineView(line)
             }
         }
+        .font(.system(size: baseFontSize))
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
@@ -69,11 +71,11 @@ struct MarkdownContentView: View {
     private func headingFont(level: Int) -> Font {
         switch level {
         case 1:
-            .title3.weight(.bold)
+            .system(size: baseFontSize * 1.45, weight: .bold)
         case 2:
-            .headline.weight(.semibold)
+            .system(size: baseFontSize * 1.25, weight: .semibold)
         default:
-            .subheadline.weight(.semibold)
+            .system(size: baseFontSize * 1.1, weight: .semibold)
         }
     }
 }
@@ -120,4 +122,3 @@ private struct MarkdownLine: Identifiable {
         return .paragraph(content: trimmed)
     }
 }
-
