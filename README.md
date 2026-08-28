@@ -20,7 +20,9 @@ There are no folders to organize before you begin. Open a board, put something d
 ### Highlights
 
 - **Write anywhere:** double-click an empty point to create a note exactly where you need it. Pinboard automatically adjusts placement near window edges.
-- **Text, Markdown, and images:** keep quick thoughts, structured documents, screenshots, and visual references together on one canvas.
+- **Notes, files, and links:** keep text, Markdown, images, PDFs, and web references together on one canvas.
+- **Rich link previews:** paste or drop links from YouTube, TikTok, Bilibili, X, Vimeo, and most other public webpages to fetch their title, description, and preview image. When a site has no metadata, Pinboard keeps a clean link card with its address and added time.
+- **External viewing:** double-click a PDF to open it in your default PDF app, or double-click a link to open it in your browser.
 - **Multiple boards:** separate work, study, projects, and temporary material into independent spaces. Create or switch boards from the top control, and double-click a board name to rename it.
 - **Fast search:** click Search or press `⌘F` to search the current board. Live suggestions appear as you type, unrelated cards fade into the background, and your 10 most recent searches remain close at hand.
 - **Flexible cards:** move, resize, recolor, collapse, duplicate, lock, or delete a card. Clicking a card always brings it to the front.
@@ -29,6 +31,7 @@ There are no folders to organize before you begin. Open a board, put something d
 - **Board and Desktop modes:** press `⌥ Space` to keep notes floating over the desktop without blocking the apps underneath.
 - **Grid snapping:** use the grid when you want a tidy layout, or turn it off for free placement.
 - **Automatic saving:** your boards and notes remain available the next time you open Pinboard.
+- **No duplicate originals:** images and PDFs normally stay in their original Finder location. Pinboard remembers access and keeps only a lightweight preview; if macOS cannot preserve that access, Pinboard automatically keeps a private fallback copy. Large files never live inside the note database.
 - **AI-ready:** Codex, Claude Code, and other MCP-compatible agents can create notes directly in Pinboard.
 
 ### Quick guide
@@ -38,6 +41,9 @@ There are no folders to organize before you begin. Open a board, put something d
 | Create a text note | Double-click the board or use the Text button |
 | Create a Markdown note | Use the Markdown button |
 | Add an image | Use the Image button and choose an image |
+| Add a PDF | Use the PDF button, or drag or paste a PDF onto the board |
+| Add a webpage or video link | Click the Link button, or drag or paste its URL onto the board |
+| Open a PDF or link | Double-click the card content, or use its Open button |
 | Move a note | Drag anywhere on its title bar |
 | Move an image | Hover over it, then drag the top-left handle |
 | Resize a card | Drag the handle at the bottom-right |
@@ -140,7 +146,9 @@ Pinboard 把屏幕变成一块可以自由摆放的思考空间。临时想法�
 ### 核心功能
 
 - **随处创建：** 双击画板任意空白位置即可创建便签。靠近窗口边缘时，Pinboard 会自动选择放得下的方向。
-- **文本、Markdown 与图片：** 快速记录、结构化内容、截图和视觉资料可以同时存在于一张画板上。
+- **便签、文件与链接：** 文本、Markdown、图片、PDF 和网页资料可以同时存在于一张画板上。
+- **丰富的链接预览：** 粘贴或拖入 YouTube、TikTok、Bilibili、X、Vimeo 以及大多数公开网页的 URL 后，会自动获取标题、简介和预览图；如果网页没有元数据，则显示简洁的链接地址与添加时间。
+- **调用系统应用查看：** 双击 PDF 会使用默认 PDF 应用打开，双击链接则使用默认浏览器打开。
 - **多个 Board：** 工作、学习、项目和临时资料可以放在不同画板中。通过顶部控件创建或切换 Board，双击名称即可改名。
 - **快速搜索：** 点击搜索按钮或按 `⌘F` 检索当前 Board。输入时会实时联想，不相关的便签会自动淡化，并保留最近 10 条搜索记录。
 - **自由调整便签：** 可以移动、缩放、换色、折叠、复制、锁定或删除；点击任何便签都会把它带到最上层。
@@ -149,6 +157,7 @@ Pinboard 把屏幕变成一块可以自由摆放的思考空间。临时想法�
 - **Board / Desktop 模式：** 按 `⌥ Space` 切换。Desktop 模式可以让便签悬浮显示，同时不阻挡下面的应用。
 - **网格吸附：** 需要整齐排列时打开网格，需要自由摆放时随时关闭。
 - **自动保存：** 关闭后再次打开，Board 和便签仍会保留。
+- **不重复保存原文件：** 图片和 PDF 通常继续保留在 Finder 中的原位置，Pinboard 只记住访问权限并生成轻量预览；如果 macOS 无法保留访问权限，才会自动保存一份私有副本。大文件不会进入便签数据库。
 - **支持 AI：** Codex、Claude Code 和其他支持 MCP 的 Agent 可以直接在 Pinboard 中创建便签。
 
 ### 常用操作
@@ -158,6 +167,9 @@ Pinboard 把屏幕变成一块可以自由摆放的思考空间。临时想法�
 | 创建文本便签 | 双击画板，或点击 Text 按钮 |
 | 创建 Markdown 便签 | 点击 Markdown 按钮 |
 | 添加图片 | 点击 Image 按钮并选择图片 |
+| 添加 PDF | 点击 PDF 按钮，或把 PDF 拖入、粘贴到画板 |
+| 添加网页或视频链接 | 点击 Link 按钮，或把 URL 拖入、粘贴到画板 |
+| 打开 PDF 或链接 | 双击卡片内容，或点击标题栏的打开按钮 |
 | 移动文本便签 | 按住标题栏任意位置拖动 |
 | 移动图片 | 鼠标移入图片后，拖动左上角把手 |
 | 缩放便签 | 拖动右下角把手 |

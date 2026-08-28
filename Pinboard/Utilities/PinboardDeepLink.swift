@@ -39,7 +39,7 @@ enum PinboardDeepLink {
 
         guard
             let kind = CardKind(rawValue: payload.kind),
-            kind != .image,
+            kind == .text || kind == .markdown,
             payload.title?.count ?? 0 <= maximumTitleLength,
             payload.content.count <= maximumContentLength
         else {
@@ -108,4 +108,3 @@ private extension Data {
         self.init(base64Encoded: base64)
     }
 }
-

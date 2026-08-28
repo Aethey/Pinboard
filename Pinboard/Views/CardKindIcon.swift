@@ -28,6 +28,12 @@ struct CardKindIcon: View {
             case .image:
                 Image(systemName: "photo")
                     .font(.system(size: size * 0.52, weight: .semibold))
+            case .pdf:
+                Image(systemName: "doc.richtext")
+                    .font(.system(size: size * 0.50, weight: .semibold))
+            case .link:
+                Image(systemName: "link")
+                    .font(.system(size: size * 0.50, weight: .semibold))
             }
         }
         .foregroundStyle(foregroundColor)

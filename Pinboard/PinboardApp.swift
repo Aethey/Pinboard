@@ -14,11 +14,13 @@ struct PinboardApp: App {
     private var applicationDelegate
 
     @State private var session = BoardSession()
+    @State private var attachmentLibrary = AttachmentLibrary()
 
     var body: some Scene {
         Window("Pinboard", id: "main") {
             ContentView()
                 .environment(session)
+                .environment(attachmentLibrary)
         }
         .modelContainer(
             for: [BoardCard.self, PinboardBoard.self],
@@ -39,6 +41,10 @@ struct PinboardApp: App {
 
                 Toggle("Snap to Grid", isOn: Bindable(session).snapToGrid)
             }
+        }
+
+        Settings {
+            PinboardSettingsView()
         }
     }
 }

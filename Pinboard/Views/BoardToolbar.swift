@@ -3,6 +3,7 @@
 //  Pinboard
 //
 
+import AppKit
 import SwiftUI
 
 struct BoardToolbar: View {
@@ -16,12 +17,17 @@ struct BoardToolbar: View {
     let onAddText: () -> Void
     let onAddMarkdown: () -> Void
     let onImportImage: () -> Void
+    let onImportPDF: () -> Void
+    let onAddLink: (URL) -> Void
     let onToggleGrid: () -> Void
     let onToggleMode: () -> Void
 
     @State private var isEditingBoardName = false
     @State private var boardNameDraft = ""
+    @State private var isAddingLink = false
+    @State private var linkDraft = ""
     @FocusState private var isBoardNameFocused: Bool
+    @FocusState private var isLinkFieldFocused: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -34,6 +40,11 @@ struct BoardToolbar: View {
                 kindButton(.text, action: onAddText)
                 kindButton(.markdown, action: onAddMarkdown)
                 kindButton(.image, action: onImportImage)
+                kindButton(.pdf, action: onImportPDF)
+                kindButton(.link, action: beginLinkEntry)
+                    .popover(isPresented: $isAddingLink, arrowEdge: .top) {
+                        linkEntryPopover
+                    }
             }
 
             Divider()
@@ -173,6 +184,79 @@ struct BoardToolbar: View {
         boardNameDraft = activeBoard.name
         isEditingBoardName = true
         isBoardNameFocused = true
+    }
+
+    private var linkEntryPopover: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Add Link")
+                .font(.system(size: 13, weight: .semibold))
+
+            TextField("https://example.com", text: $linkDraft)
+                .textFieldStyle(.roundedBorder)
+                .focused($isLinkFieldFocused)
+                .onSubmit(commitLink)
+                .onExitCommand {
+                    isAddingLink = false
+                }
+
+            HStack {
+                Text("Paste any public webpage or video URL.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Button("Cancel") {
+                    isAddingLink = false
+                }
+
+                Button("Add", action: commitLink)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(preparedLinkURL == nil)
+            }
+        }
+        .padding(14)
+        .frame(width: 380)
+    }
+
+    private func beginLinkEntry() {
+        if let clipboardText = NSPasteboard.general.string(forType: .string),
+           normalizedWebURL(from: clipboardText) != nil {
+            linkDraft = clipboardText.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            linkDraft = ""
+        }
+        isAddingLink = true
+        Task { @MainActor in
+            isLinkFieldFocused = true
+        }
+    }
+
+    private var preparedLinkURL: URL? {
+        normalizedWebURL(from: linkDraft)
+    }
+
+    private func commitLink() {
+        guard let url = preparedLinkURL else { return }
+        onAddLink(url)
+        isAddingLink = false
+        linkDraft = ""
+    }
+
+    private func normalizedWebURL(from input: String) -> URL? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains(where: { $0.isWhitespace }) else {
+            return nil
+        }
+
+        let candidate = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
+        guard
+            let url = URL(string: candidate),
+            let scheme = url.scheme?.lowercased(),
+            scheme == "https" || scheme == "http",
+            url.host() != nil
+        else { return nil }
+        return url
     }
 
     private func commitBoardName() {

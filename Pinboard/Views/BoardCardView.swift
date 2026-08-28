@@ -3,9 +3,12 @@
 //  Pinboard
 //
 
+import AppKit
 import SwiftUI
 
 struct BoardCardView: View {
+    @Environment(AttachmentLibrary.self) private var attachmentLibrary
+
     private enum FocusedField: Hashable {
         case title
         case content
@@ -71,7 +74,9 @@ struct BoardCardView: View {
                     transaction.animation = nil
                 }
             }
-            .onAppear(perform: normalizeMinimumSize)
+            .onAppear {
+                normalizeMinimumSize()
+            }
             .onChange(of: mode) { _, mode in
                 if mode != .board {
                     isEditingTitle = false
@@ -102,6 +107,10 @@ struct BoardCardView: View {
             }
             .contextMenu {
                 if mode == .board {
+                    if card.kind == .pdf || card.kind == .link {
+                        Button("Open", action: openExternalContent)
+                        Divider()
+                    }
                     Button(card.isLocked ? "Unlock" : "Lock", action: toggleLock)
                     if card.kind != .image {
                         Button(card.isCollapsed ? "Expand" : "Collapse", action: toggleCollapsed)
@@ -141,9 +150,9 @@ struct BoardCardView: View {
             CardKindIcon(
                 kind: card.kind,
                 size: PinboardTheme.Controls.cardIconSize,
-                backgroundColor: card.theme.color,
-                foregroundColor: card.theme.highContrastForeground,
-                borderColor: card.theme.highContrastForeground.opacity(0.24)
+                backgroundColor: kindIconBackground,
+                foregroundColor: kindIconForeground,
+                borderColor: kindIconForeground.opacity(0.24)
             )
             .help(card.isLocked ? "Card locked" : "Drag card")
 
@@ -170,6 +179,19 @@ struct BoardCardView: View {
                 HStack(spacing: 4) {
                     if !card.isCollapsed, !card.isLocked {
                         HStack(spacing: 0) {
+                            if card.kind == .pdf || card.kind == .link {
+                                PinboardIconButton(
+                                    systemImage: "arrow.up.forward.app",
+                                    accessibilityLabel: card.kind == .pdf
+                                        ? "Open PDF"
+                                        : "Open link",
+                                    help: card.kind == .pdf
+                                        ? "Open PDF in the default app"
+                                        : "Open link in the browser",
+                                    action: openExternalContent
+                                )
+                            }
+
                             if card.kind == .markdown {
                                 PinboardIconButton(
                                     systemImage: showsMarkdownPreview ? "pencil" : "eye",
@@ -184,19 +206,21 @@ struct BoardCardView: View {
                                 )
                             }
 
-                            PinboardIconButton(
-                                systemImage: "paintpalette",
-                                accessibilityLabel: "Next color",
-                                help: "Next color",
-                                action: cycleTheme
-                            )
+                            if card.kind != .link {
+                                PinboardIconButton(
+                                    systemImage: "paintpalette",
+                                    accessibilityLabel: "Next color",
+                                    help: "Next color",
+                                    action: cycleTheme
+                                )
 
-                            PinboardIconButton(
-                                systemImage: "textformat.size",
-                                accessibilityLabel: card.fontSize.title,
-                                help: "Next font size",
-                                action: cycleFontSize
-                            )
+                                PinboardIconButton(
+                                    systemImage: "textformat.size",
+                                    accessibilityLabel: card.fontSize.title,
+                                    help: "Next font size",
+                                    action: cycleFontSize
+                                )
+                            }
                         }
                     }
 
@@ -271,6 +295,21 @@ struct BoardCardView: View {
 
         case .image:
             imageContent
+
+        case .pdf:
+            pdfContent
+
+        case .link:
+            ZStack {
+                if card.linkMetadataState == .loading {
+                    linkLoadingContent
+                        .transition(.opacity)
+                } else {
+                    linkContent
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.24), value: card.linkMetadataStateRawValue)
         }
     }
 
@@ -300,31 +339,58 @@ struct BoardCardView: View {
             imageContent
 
             if mode == .board, isHovering {
-                HStack(spacing: 6) {
-                    Image(
-                        systemName: card.isLocked
-                            ? "lock"
-                            : "arrow.up.and.down.and.arrow.left.and.right"
-                    )
-                        .symbolRenderingMode(.monochrome)
-                        .font(.system(size: 11, weight: .medium))
-                        .frame(
-                            width: PinboardTheme.Controls.cardButtonSize,
-                            height: PinboardTheme.Controls.cardButtonSize
+                ZStack {
+                    HStack(spacing: 6) {
+                        Image(
+                            systemName: card.isLocked
+                                ? "lock"
+                                : "arrow.up.and.down.and.arrow.left.and.right"
                         )
-                        .contentShape(Rectangle())
-                        .gesture(dragGesture)
-                        .help(card.isLocked ? "Card locked" : "Drag image")
+                            .symbolRenderingMode(.monochrome)
+                            .font(.system(size: 11, weight: .medium))
+                            .frame(
+                                width: PinboardTheme.Controls.cardButtonSize,
+                                height: PinboardTheme.Controls.cardButtonSize
+                            )
+                            .contentShape(Rectangle())
+                            .gesture(dragGesture)
+                            .help(card.isLocked ? "Card locked" : "Drag image")
 
-                    Spacer(minLength: 8)
+                        Spacer(minLength: 8)
 
-                    PinboardIconButton(
-                        systemImage: "trash",
-                        accessibilityLabel: "Delete image",
-                        help: "Delete image",
-                        emphasis: .destructive,
-                        action: onDelete
-                    )
+                        PinboardIconButton(
+                            systemImage: "trash",
+                            accessibilityLabel: "Delete image",
+                            help: "Delete image",
+                            emphasis: .destructive,
+                            action: onDelete
+                        )
+                    }
+
+                    Group {
+                        if !card.isLocked, isEditingTitle {
+                            TextField("Image title", text: binding(for: \BoardCard.title))
+                                .textFieldStyle(.plain)
+                                .focused($focusedField, equals: .title)
+                                .onSubmit {
+                                    finishTitleEditing()
+                                }
+                        } else {
+                            Text(card.title)
+                                .lineLimit(1)
+                                .contentShape(Rectangle())
+                                .onTapGesture(count: 2, perform: beginTitleEditing)
+                                .help(
+                                    card.isLocked
+                                        ? "Card locked"
+                                        : "Double-click to edit title"
+                                )
+                        }
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 34)
                 }
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.primary.opacity(0.88))
@@ -346,7 +412,7 @@ struct BoardCardView: View {
 
     @ViewBuilder
     private var imageContent: some View {
-        if let image = card.image {
+        if let image = resolvedPreviewImage ?? card.image {
             Image(nsImage: image)
                 .resizable()
                 .interpolation(.high)
@@ -360,12 +426,264 @@ struct BoardCardView: View {
         }
     }
 
+    private var pdfContent: some View {
+        HStack(spacing: 14) {
+            Group {
+                if let resolvedPreviewImage {
+                    Image(nsImage: resolvedPreviewImage)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                } else {
+                    Image(systemName: "doc.richtext")
+                        .font(.system(size: 34, weight: .light))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 88, height: 132)
+            .background(.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text(card.sourceFileName ?? "PDF document")
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(2)
+
+                if let pageCount = card.pageCount {
+                    Label(
+                        "\(pageCount) \(pageCount == 1 ? "page" : "pages")",
+                        systemImage: "doc.on.doc"
+                    )
+                }
+
+                if let fileSize = card.fileSize, fileSize > 0 {
+                    Label(formattedFileSize(fileSize), systemImage: "internaldrive")
+                }
+
+                Spacer(minLength: 2)
+
+                Label("Double-click to open", systemImage: "arrow.up.forward.app")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.system(size: 11))
+
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2, perform: openExternalContent)
+        .help("Double-click to open in the default PDF app")
+    }
+
+    private var linkContent: some View {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                if let resolvedPreviewImage {
+                    linkPreview(resolvedPreviewImage, in: geometry.size)
+
+                    Divider()
+                        .opacity(0.45)
+                }
+
+                linkDetails
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2, perform: openExternalContent)
+        .help("Double-click to open in the browser")
+    }
+
+    private var linkLoadingContent: some View {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(.black.opacity(0.08))
+
+                    linkLoadingShimmer
+
+                    VStack(spacing: 9) {
+                        Image(systemName: "link")
+                            .symbolRenderingMode(.hierarchical)
+                            .font(.system(size: 24, weight: .medium))
+                            .symbolEffect(.pulse.byLayer, options: .repeat(.continuous))
+
+                        Text("Preparing preview")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(PinboardTheme.selection.opacity(0.82))
+                }
+                .frame(height: linkLoadingPreviewHeight(in: geometry.size))
+                .clipped()
+
+                Divider()
+                    .opacity(0.35)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 7) {
+                        Image(systemName: "globe")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.secondary)
+
+                        Text(linkHost ?? "Link")
+                            .font(.system(size: 11, weight: .semibold))
+                            .lineLimit(1)
+
+                        Spacer(minLength: 8)
+
+                        ProgressView()
+                            .controlSize(.mini)
+                    }
+
+                    loadingLine(width: geometry.size.width * 0.64)
+                    loadingLine(width: geometry.size.width * 0.42)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Loading link preview")
+    }
+
+    private var linkLoadingShimmer: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            GeometryReader { geometry in
+                let duration = 1.6
+                let phase = CGFloat(
+                    timeline.date.timeIntervalSinceReferenceDate
+                        .truncatingRemainder(dividingBy: duration) / duration
+                )
+                let shimmerWidth = max(80, geometry.size.width * 0.42)
+
+                LinearGradient(
+                    colors: [
+                        .clear,
+                        PinboardTheme.selection.opacity(0.04),
+                        .white.opacity(0.16),
+                        PinboardTheme.selection.opacity(0.04),
+                        .clear,
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: shimmerWidth, height: geometry.size.height * 1.6)
+                .rotationEffect(.degrees(12))
+                .offset(
+                    x: -shimmerWidth + (geometry.size.width + shimmerWidth * 2) * phase,
+                    y: -geometry.size.height * 0.3
+                )
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func loadingLine(width: CGFloat) -> some View {
+        Capsule(style: .continuous)
+            .fill(.primary.opacity(0.08))
+            .frame(width: max(44, width), height: 6)
+    }
+
+    private func linkLoadingPreviewHeight(in availableSize: CGSize) -> CGFloat {
+        min(118, max(88, availableSize.height - 76))
+    }
+
+    private func linkPreview(_ image: NSImage, in availableSize: CGSize) -> some View {
+        ZStack {
+            Color.black.opacity(0.12)
+
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            if card.linkIsVideo {
+                Image(systemName: "play.circle.fill")
+                    .symbolRenderingMode(.hierarchical)
+                    .font(.system(size: 38, weight: .medium))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.38), radius: 7, y: 2)
+            }
+        }
+        .frame(height: linkPreviewHeight(in: availableSize))
+        .clipped()
+    }
+
+    private var linkDetails: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: card.linkIsVideo ? "play.rectangle" : "globe")
+                    .foregroundStyle(.secondary)
+
+                Text(linkHost ?? "Link")
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+
+                Spacer(minLength: 4)
+
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            if !card.content.isEmpty,
+               card.content != card.sourceURLString {
+                Text(card.content)
+                    .font(.system(size: 13))
+                    .lineLimit(3)
+            } else if let sourceURLString = card.sourceURLString {
+                Text(sourceURLString)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+            }
+
+            Spacer(minLength: 2)
+
+            Text(card.createdAt, format: .dateTime.year().month().day().hour().minute())
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func linkPreviewHeight(in availableSize: CGSize) -> CGFloat {
+        let ratio = max(0.1, card.imageHeightToWidthRatio ?? (9.0 / 16.0))
+        let naturalHeight = availableSize.width * ratio
+        let maximumHeight = max(80, availableSize.height - 88)
+        return min(max(96, naturalHeight), min(210, maximumHeight))
+    }
+
     @ViewBuilder
     private var cardSurfaceBackground: some View {
         if card.kind == .image {
             Color.black.opacity(0.025)
+        } else if card.kind == .link {
+            linkCardBackground
         } else {
             cardBackground
+        }
+    }
+
+    private var linkCardBackground: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            linkThemeColor.opacity(mode == .board ? 0.22 : 0.27),
+                            linkThemeColor.opacity(mode == .board ? 0.08 : 0.12),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                .fill(.black.opacity(mode == .board ? 0.08 : 0.12))
         }
     }
 
@@ -422,8 +740,34 @@ struct BoardCardView: View {
         card.kind == .image ? 12 : 14
     }
 
+    private var kindIconBackground: Color {
+        card.kind == .link ? linkThemeColor : card.theme.color
+    }
+
+    private var kindIconForeground: Color {
+        card.kind == .link ? .white : card.theme.highContrastForeground
+    }
+
+    private var linkThemeColor: Color {
+        guard
+            card.kind == .link,
+            let color = attachmentLibrary.previewThemeColor(
+                relativePath: card.previewImageRelativePath
+            )
+        else { return PinboardTheme.selection }
+        return Color(nsColor: color)
+    }
+
     private var imageHeightToWidthRatio: Double {
         max(0.01, card.imageHeightToWidthRatio ?? (card.height / max(1, card.width)))
+    }
+
+    private var linkHost: String? {
+        guard
+            let sourceURLString = card.sourceURLString,
+            let url = URL(string: sourceURLString)
+        else { return nil }
+        return url.host(percentEncoded: false)
     }
 
     private var displayedCardSize: CGSize {
@@ -598,6 +942,32 @@ struct BoardCardView: View {
             focusedField = nil
         }
         card.updatedAt = .now
+    }
+
+    private func openExternalContent() {
+        activateCard()
+        switch card.kind {
+        case .pdf:
+            if let refreshedBookmark = attachmentLibrary.openAttachment(
+                relativePath: card.attachmentRelativePath,
+                sourceBookmark: card.sourceFileBookmark
+            ) {
+                card.sourceFileBookmark = refreshedBookmark
+                card.updatedAt = .now
+            }
+        case .link:
+            attachmentLibrary.openWebURL(card.sourceURLString.flatMap(URL.init(string:)))
+        case .text, .markdown, .image:
+            break
+        }
+    }
+
+    private var resolvedPreviewImage: NSImage? {
+        attachmentLibrary.previewImage(relativePath: card.previewImageRelativePath)
+    }
+
+    private func formattedFileSize(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 
     private func normalizeMinimumSize() {

@@ -11,6 +11,8 @@ enum CardKind: String, CaseIterable, Identifiable {
     case text
     case markdown
     case image
+    case pdf
+    case link
 
     var id: String { rawValue }
 
@@ -22,9 +24,18 @@ enum CardKind: String, CaseIterable, Identifiable {
             "Markdown"
         case .image:
             "Image"
+        case .pdf:
+            "PDF"
+        case .link:
+            "Link"
         }
     }
 
+}
+
+enum LinkMetadataState: String {
+    case loading
+    case ready
 }
 
 enum CardTheme: String, CaseIterable, Identifiable {
@@ -74,9 +85,20 @@ final class BoardCard {
     var title: String
     var content: String
     var boardID: UUID?
+    // Kept only to migrate images saved by earlier builds. New attachments use
+    // file references and lightweight previews; this value is then cleared.
     @Attribute(.externalStorage) var imageData: Data?
     var imagePixelWidth: Double?
     var imagePixelHeight: Double?
+    var attachmentRelativePath: String?
+    var sourceFileBookmark: Data?
+    var previewImageRelativePath: String?
+    var sourceURLString: String?
+    var linkIsVideo: Bool = false
+    var linkMetadataStateRawValue: String = LinkMetadataState.ready.rawValue
+    var sourceFileName: String?
+    var fileSize: Int64?
+    var pageCount: Int?
     var positionX: Double
     var positionY: Double
     var width: Double
@@ -99,6 +121,15 @@ final class BoardCard {
         imageData: Data? = nil,
         imagePixelWidth: Double? = nil,
         imagePixelHeight: Double? = nil,
+        attachmentRelativePath: String? = nil,
+        sourceFileBookmark: Data? = nil,
+        previewImageRelativePath: String? = nil,
+        sourceURLString: String? = nil,
+        linkIsVideo: Bool = false,
+        linkMetadataState: LinkMetadataState = .ready,
+        sourceFileName: String? = nil,
+        fileSize: Int64? = nil,
+        pageCount: Int? = nil,
         positionX: Double = 320,
         positionY: Double = 260,
         width: Double = 390,
@@ -120,6 +151,15 @@ final class BoardCard {
         self.imageData = imageData
         self.imagePixelWidth = imagePixelWidth
         self.imagePixelHeight = imagePixelHeight
+        self.attachmentRelativePath = attachmentRelativePath
+        self.sourceFileBookmark = sourceFileBookmark
+        self.previewImageRelativePath = previewImageRelativePath
+        self.sourceURLString = sourceURLString
+        self.linkIsVideo = linkIsVideo
+        self.linkMetadataStateRawValue = linkMetadataState.rawValue
+        self.sourceFileName = sourceFileName
+        self.fileSize = fileSize
+        self.pageCount = pageCount
         self.positionX = positionX
         self.positionY = positionY
         self.width = width
@@ -147,6 +187,11 @@ final class BoardCard {
     var fontSize: CardFontSize {
         get { CardFontSize(rawValue: fontSizeRawValue) ?? .medium }
         set { fontSizeRawValue = newValue.rawValue }
+    }
+
+    var linkMetadataState: LinkMetadataState {
+        get { LinkMetadataState(rawValue: linkMetadataStateRawValue) ?? .ready }
+        set { linkMetadataStateRawValue = newValue.rawValue }
     }
 
     var image: NSImage? {

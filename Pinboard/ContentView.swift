@@ -6,21 +6,35 @@
 //
 
 import AppKit
-import ImageIO
 import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
+    private enum AttachmentImportKind {
+        case image
+        case pdf
+
+        var allowedContentTypes: [UTType] {
+            switch self {
+            case .image:
+                [.image]
+            case .pdf:
+                [.pdf]
+            }
+        }
+    }
+
     @Environment(\.modelContext) private var modelContext
     @Environment(BoardSession.self) private var session
+    @Environment(AttachmentLibrary.self) private var attachmentLibrary
     @Query(sort: \BoardCard.zIndex) private var allCards: [BoardCard]
     @Query(sort: \PinboardBoard.sortOrder) private var boards: [PinboardBoard]
 
     @AppStorage("didCreateWelcomeCards") private var didCreateWelcomeCards = false
     @AppStorage("activeBoardID") private var activeBoardIDString = ""
-    @State private var isImportingImage = false
     @State private var search = BoardSearchController()
+    @FocusState private var isBoardFocused: Bool
 
     private var activeBoardID: UUID? {
         UUID(uuidString: activeBoardIDString)
@@ -48,6 +62,7 @@ struct ContentView: View {
                 .onTapGesture {
                     guard session.mode == .board else { return }
                     session.selectedCardID = nil
+                    isBoardFocused = true
                 }
                 .simultaneousGesture(
                     SpatialTapGesture(count: 2, coordinateSpace: .local)
@@ -99,7 +114,13 @@ struct ContentView: View {
                                 onRenameBoard: renameActiveBoard,
                                 onAddText: { addCard(kind: .text, canvasSize: geometry.size) },
                                 onAddMarkdown: { addCard(kind: .markdown, canvasSize: geometry.size) },
-                                onImportImage: { isImportingImage = true },
+                                onImportImage: {
+                                    presentFileImporter(for: .image, canvasSize: geometry.size)
+                                },
+                                onImportPDF: {
+                                    presentFileImporter(for: .pdf, canvasSize: geometry.size)
+                                },
+                                onAddLink: { addLink($0, canvasSize: geometry.size) },
                                 onToggleGrid: { session.snapToGrid.toggle() },
                                 onToggleMode: session.toggleMode
                             )
@@ -112,15 +133,33 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .fileImporter(
-                isPresented: $isImportingImage,
-                allowedContentTypes: [.image],
-                allowsMultipleSelection: false
-            ) { result in
-                importImage(result, canvasSize: geometry.size)
+            .focusable()
+            .focusEffectDisabled()
+            .focused($isBoardFocused)
+            .onKeyPress(.init("v"), phases: .down) { keyPress in
+                guard
+                    session.mode == .board,
+                    keyPress.modifiers.contains(.command)
+                else { return .ignored }
+                return pasteFromGeneralPasteboard(canvasSize: geometry.size)
+                    ? .handled
+                    : .ignored
+            }
+            .dropDestination(for: URL.self, isEnabled: session.mode == .board) { urls, session in
+                importDroppedURLs(
+                    urls,
+                    at: session.location,
+                    canvasSize: geometry.size
+                )
+            }
+            .onPasteCommand(of: [.fileURL, .url, .plainText]) { providers in
+                importPastedItems(providers, canvasSize: geometry.size)
             }
             .onOpenURL { url in
                 handleOpenURL(url, canvasSize: geometry.size)
+            }
+            .task {
+                await resumePendingLinkMetadata(canvasSize: geometry.size)
             }
         }
         .frame(minWidth: 720, minHeight: 520)
@@ -128,6 +167,12 @@ struct ContentView: View {
         .onAppear {
             session.installGlobalHotKeyIfNeeded()
             preparePersistentBoards()
+            Task { @MainActor in
+                isBoardFocused = true
+            }
+        }
+        .task(id: attachmentLibrary.locationIdentifier) {
+            await migrateLegacyImagesIfNeeded()
         }
         .onChange(of: cards.map(\.updatedAt), initial: true) {
             search.updateDocuments(from: cards)
@@ -289,21 +334,32 @@ struct ContentView: View {
         saveNow()
     }
 
-    private func addImage(_ data: Data, pixelSize: CGSize, canvasSize: CGSize) {
+    private func addImage(
+        _ stored: StoredAttachment,
+        id: UUID,
+        canvasSize: CGSize,
+        corner: CGPoint? = nil
+    ) {
+        guard let pixelSize = stored.pixelSize else { return }
         let cardSize = imageCardSize(for: pixelSize, canvasSize: canvasSize)
         let position = clampedCenter(
-            nextPosition(in: canvasSize),
+            corner ?? nextPosition(in: canvasSize),
             cardSize: cardSize,
             canvasSize: canvasSize
         )
 
         let card = BoardCard(
+            id: id,
             kind: .image,
             title: "Image",
             boardID: activeBoard?.id,
-            imageData: data,
             imagePixelWidth: pixelSize.width,
             imagePixelHeight: pixelSize.height,
+            attachmentRelativePath: stored.attachmentRelativePath,
+            sourceFileBookmark: stored.sourceFileBookmark,
+            previewImageRelativePath: stored.previewImageRelativePath,
+            sourceFileName: stored.sourceFileName,
+            fileSize: stored.fileSize,
             positionX: position.x,
             positionY: position.y,
             width: cardSize.width,
@@ -317,23 +373,327 @@ struct ContentView: View {
         saveNow()
     }
 
-    private func importImage(_ result: Result<[URL], Error>, canvasSize: CGSize) {
-        guard case let .success(urls) = result, let url = urls.first else { return }
+    private func presentFileImporter(
+        for kind: AttachmentImportKind,
+        canvasSize: CGSize
+    ) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = kind.allowedContentTypes
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.prompt = "Add"
 
-        let hasScopedAccess = url.startAccessingSecurityScopedResource()
-        defer {
-            if hasScopedAccess {
-                url.stopAccessingSecurityScopedResource()
+        let completion: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK, let url = panel.url else { return }
+            Task { @MainActor in
+                importIncomingURL(url, canvasSize: canvasSize)
+                isBoardFocused = true
             }
         }
 
-        guard
-            let data = try? Data(contentsOf: url),
-            NSImage(data: data) != nil,
-            let metadata = ImageMetadata(data: data)
-        else { return }
+        if let window = NSApp.keyWindow {
+            panel.beginSheetModal(for: window, completionHandler: completion)
+        } else {
+            panel.begin(completionHandler: completion)
+        }
+    }
 
-        addImage(data, pixelSize: metadata.pixelSize, canvasSize: canvasSize)
+    private func importImageFile(
+        _ url: URL,
+        canvasSize: CGSize,
+        corner: CGPoint? = nil
+    ) {
+        let id = UUID()
+        Task {
+            guard let stored = try? await attachmentLibrary.importImage(from: url, id: id) else {
+                return
+            }
+            addImage(stored, id: id, canvasSize: canvasSize, corner: corner)
+        }
+    }
+
+    private func importPDFFile(
+        _ url: URL,
+        canvasSize: CGSize,
+        corner: CGPoint? = nil
+    ) {
+        let id = UUID()
+        Task {
+            guard let stored = try? await attachmentLibrary.importPDF(from: url, id: id) else {
+                return
+            }
+            addPDF(stored, id: id, canvasSize: canvasSize, corner: corner)
+        }
+    }
+
+    private func addPDF(
+        _ stored: StoredAttachment,
+        id: UUID,
+        canvasSize: CGSize,
+        corner: CGPoint?
+    ) {
+        let cardSize = defaultSize(for: .pdf)
+        let position = clampedCenter(
+            corner ?? nextPosition(in: canvasSize),
+            cardSize: cardSize,
+            canvasSize: canvasSize
+        )
+        let fileTitle = URL(fileURLWithPath: stored.sourceFileName)
+            .deletingPathExtension()
+            .lastPathComponent
+        let pageDescription = stored.pageCount.map {
+            "\($0) \($0 == 1 ? "page" : "pages")"
+        } ?? "PDF document"
+        let card = BoardCard(
+            id: id,
+            kind: .pdf,
+            title: fileTitle.isEmpty ? "PDF" : fileTitle,
+            content: "\(stored.sourceFileName)\n\(pageDescription)",
+            boardID: activeBoard?.id,
+            imagePixelWidth: stored.pixelSize.map { Double($0.width) },
+            imagePixelHeight: stored.pixelSize.map { Double($0.height) },
+            attachmentRelativePath: stored.attachmentRelativePath,
+            sourceFileBookmark: stored.sourceFileBookmark,
+            previewImageRelativePath: stored.previewImageRelativePath,
+            sourceFileName: stored.sourceFileName,
+            fileSize: stored.fileSize,
+            pageCount: stored.pageCount,
+            positionX: position.x,
+            positionY: position.y,
+            width: cardSize.width,
+            height: cardSize.height,
+            theme: nextTheme,
+            zIndex: nextZIndex
+        )
+
+        modelContext.insert(card)
+        session.selectedCardID = card.id
+        saveNow()
+    }
+
+    private func addLink(_ url: URL, canvasSize: CGSize, corner: CGPoint? = nil) {
+        guard let webURL = normalizedWebURL(url) else { return }
+        let id = UUID()
+        let cardSize = defaultSize(for: .link)
+        let position = clampedCenter(
+            corner ?? nextPosition(in: canvasSize),
+            cardSize: cardSize,
+            canvasSize: canvasSize
+        )
+        let card = BoardCard(
+            id: id,
+            kind: .link,
+            title: "Loading link",
+            content: webURL.absoluteString,
+            boardID: activeBoard?.id,
+            sourceURLString: webURL.absoluteString,
+            linkMetadataState: .loading,
+            positionX: position.x,
+            positionY: position.y,
+            width: cardSize.width,
+            height: cardSize.height,
+            theme: .graphite,
+            zIndex: nextZIndex
+        )
+
+        modelContext.insert(card)
+        session.selectedCardID = card.id
+        saveNow()
+
+        Task {
+            await enrichLinkCard(id: id, originalURL: webURL, canvasSize: canvasSize)
+        }
+    }
+
+    private func enrichLinkCard(id: UUID, originalURL: URL, canvasSize: CGSize) async {
+        let metadata = await LinkMetadataService.fetch(for: originalURL)
+        guard let currentCard = allCards.first(where: { $0.id == id }) else {
+            if let temporaryURL = metadata.temporaryImageURL {
+                try? FileManager.default.removeItem(at: temporaryURL)
+            }
+            return
+        }
+
+        if let title = metadata.title,
+           currentCard.title == "Link" || currentCard.title == "Loading link" {
+            currentCard.title = String(title.prefix(200))
+        } else if currentCard.title == "Loading link" {
+            currentCard.title = metadata.resolvedURL.host(percentEncoded: false) ?? "Link"
+        }
+        currentCard.sourceURLString = metadata.resolvedURL.absoluteString
+        currentCard.content = metadata.summary.map { String($0.prefix(2_000)) }
+            ?? metadata.resolvedURL.absoluteString
+        currentCard.linkIsVideo = metadata.isVideo
+
+        if let temporaryURL = metadata.temporaryImageURL {
+            defer { try? FileManager.default.removeItem(at: temporaryURL) }
+            if let preview = try? await attachmentLibrary.storeLinkPreview(
+                from: temporaryURL,
+                id: id
+            ) {
+                guard let card = allCards.first(where: { $0.id == id }) else {
+                    await attachmentLibrary.remove(relativePaths: [preview.relativePath])
+                    return
+                }
+                card.previewImageRelativePath = preview.relativePath
+                card.imagePixelWidth = preview.pixelSize.width
+                card.imagePixelHeight = preview.pixelSize.height
+
+                let cardSize = linkCardSize(for: preview.pixelSize, canvasSize: canvasSize)
+                card.width = cardSize.width
+                card.height = cardSize.height
+                let center = clampedCenter(
+                    CGPoint(x: card.positionX, y: card.positionY),
+                    cardSize: cardSize,
+                    canvasSize: canvasSize
+                )
+                card.positionX = center.x
+                card.positionY = center.y
+            }
+        }
+
+        currentCard.linkMetadataState = .ready
+        currentCard.updatedAt = .now
+        saveNow()
+    }
+
+    private func resumePendingLinkMetadata(canvasSize: CGSize) async {
+        let pendingLinks = allCards.compactMap { card -> (UUID, URL)? in
+            guard
+                card.kind == .link,
+                card.linkMetadataState == .loading,
+                let sourceURLString = card.sourceURLString,
+                let sourceURL = URL(string: sourceURLString)
+            else { return nil }
+            return (card.id, sourceURL)
+        }
+
+        for (id, sourceURL) in pendingLinks {
+            await enrichLinkCard(id: id, originalURL: sourceURL, canvasSize: canvasSize)
+        }
+    }
+
+    private func importDroppedURLs(_ urls: [URL], at location: CGPoint, canvasSize: CGSize) {
+        for (index, url) in urls.prefix(12).enumerated() {
+            let offset = CGFloat(index * 18)
+            importIncomingURL(
+                url,
+                canvasSize: canvasSize,
+                corner: CGPoint(x: location.x + offset, y: location.y + offset)
+            )
+        }
+    }
+
+    private func importPastedItems(_ providers: [NSItemProvider], canvasSize: CGSize) {
+        for provider in providers.prefix(12) {
+            let preferredType: UTType?
+            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                preferredType = .fileURL
+            } else if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+                preferredType = .url
+            } else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
+                preferredType = .plainText
+            } else {
+                preferredType = nil
+            }
+
+            guard let preferredType else { continue }
+            provider.loadItem(forTypeIdentifier: preferredType.identifier, options: nil) { item, _ in
+                guard let url = Self.decodeURL(from: item) else { return }
+                Task { @MainActor in
+                    importIncomingURL(url, canvasSize: canvasSize)
+                }
+            }
+        }
+    }
+
+    private func pasteFromGeneralPasteboard(canvasSize: CGSize) -> Bool {
+        let pasteboard = NSPasteboard.general
+
+        if let objects = pasteboard.readObjects(
+            forClasses: [NSURL.self],
+            options: [.urlReadingFileURLsOnly: true]
+        ),
+           let fileURL = objects.compactMap({ $0 as? NSURL }).first as URL? {
+            importIncomingURL(fileURL, canvasSize: canvasSize)
+            return true
+        }
+
+        let candidate = pasteboard.string(forType: .URL)
+            ?? pasteboard.string(forType: .string)
+        guard let candidate, let url = normalizedPastedWebURL(candidate) else {
+            return false
+        }
+        addLink(url, canvasSize: canvasSize)
+        return true
+    }
+
+    private func normalizedPastedWebURL(_ value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains(where: { $0.isWhitespace }) else {
+            return nil
+        }
+        let candidate = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
+        guard let url = URL(string: candidate) else { return nil }
+        return normalizedWebURL(url)
+    }
+
+    private func importIncomingURL(_ url: URL, canvasSize: CGSize, corner: CGPoint? = nil) {
+        if url.isFileURL {
+            let contentType = (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType
+                ?? UTType(filenameExtension: url.pathExtension)
+            if contentType?.conforms(to: .image) == true {
+                importImageFile(url, canvasSize: canvasSize, corner: corner)
+            } else if contentType?.conforms(to: .pdf) == true {
+                importPDFFile(url, canvasSize: canvasSize, corner: corner)
+            }
+            return
+        }
+
+        addLink(url, canvasSize: canvasSize, corner: corner)
+    }
+
+    private func normalizedWebURL(_ url: URL) -> URL? {
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
+            return nil
+        }
+        return url
+    }
+
+    private static func decodeURL(from item: NSSecureCoding?) -> URL? {
+        if let url = item as? URL { return url }
+        if let url = item as? NSURL { return url as URL }
+        if let string = item as? String { return URL(string: string.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        if let data = item as? Data {
+            if let url = URL(dataRepresentation: data, relativeTo: nil) { return url }
+            if let string = String(data: data, encoding: .utf8) {
+                return URL(string: string.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        }
+        return nil
+    }
+
+    private func migrateLegacyImagesIfNeeded() async {
+        for card in allCards where card.kind == .image
+            && card.attachmentRelativePath == nil
+            && card.imageData != nil {
+            guard let legacyData = card.imageData else { continue }
+            guard let stored = try? await attachmentLibrary.migrateLegacyImage(
+                legacyData,
+                id: card.id
+            ) else { continue }
+
+            card.attachmentRelativePath = stored.attachmentRelativePath
+            card.sourceFileBookmark = stored.sourceFileBookmark
+            card.previewImageRelativePath = stored.previewImageRelativePath
+            card.sourceFileName = stored.sourceFileName
+            card.fileSize = stored.fileSize
+            card.imagePixelWidth = stored.pixelSize.map { Double($0.width) }
+            card.imagePixelHeight = stored.pixelSize.map { Double($0.height) }
+            card.imageData = nil
+            saveNow()
+        }
     }
 
     private func activate(_ card: BoardCard) {
@@ -356,6 +716,15 @@ struct ContentView: View {
             imageData: card.imageData,
             imagePixelWidth: card.imagePixelWidth,
             imagePixelHeight: card.imagePixelHeight,
+            attachmentRelativePath: card.attachmentRelativePath,
+            sourceFileBookmark: card.sourceFileBookmark,
+            previewImageRelativePath: card.previewImageRelativePath,
+            sourceURLString: card.sourceURLString,
+            linkIsVideo: card.linkIsVideo,
+            linkMetadataState: .ready,
+            sourceFileName: card.sourceFileName,
+            fileSize: card.fileSize,
+            pageCount: card.pageCount,
             positionX: min(card.positionX + 28, width - card.width / 2),
             positionY: min(card.positionY + 28, height - card.height / 2),
             width: card.width,
@@ -376,8 +745,17 @@ struct ContentView: View {
         if session.selectedCardID == card.id {
             session.selectedCardID = nil
         }
+        let paths = [card.attachmentRelativePath, card.previewImageRelativePath].compactMap { $0 }
+        let pathsUsedElsewhere = Set(allCards.lazy.filter { $0.id != card.id }.flatMap {
+            [$0.attachmentRelativePath, $0.previewImageRelativePath].compactMap { $0 }
+        })
+        let orphanedPaths = paths.filter { !pathsUsedElsewhere.contains($0) }
+
         modelContext.delete(card)
         saveNow()
+        Task {
+            await attachmentLibrary.remove(relativePaths: orphanedPaths)
+        }
     }
 
     private func nextPosition(in canvasSize: CGSize) -> CGPoint {
@@ -395,6 +773,10 @@ struct ContentView: View {
             CGSize(width: 320, height: 240)
         case .image:
             CGSize(width: 320, height: 200)
+        case .pdf:
+            CGSize(width: 360, height: 220)
+        case .link:
+            CGSize(width: 420, height: 210)
         }
     }
 
@@ -413,6 +795,16 @@ struct ContentView: View {
         }
 
         return CGSize(width: width, height: height)
+    }
+
+    private func linkCardSize(for pixelSize: CGSize, canvasSize: CGSize) -> CGSize {
+        let maximumWidth = max(320, min(480, canvasSize.width - 48))
+        let width = min(420, maximumWidth)
+        let ratio = max(0.1, pixelSize.height / max(1, pixelSize.width))
+        let previewHeight = min(max(width * ratio, 120), 210)
+        let desiredHeight = PinboardTheme.Controls.cardHeaderHeight + previewHeight + 88
+        let maximumHeight = max(180, canvasSize.height - 48)
+        return CGSize(width: width, height: min(desiredHeight, maximumHeight))
     }
 
     private func clampedCenter(
@@ -466,42 +858,10 @@ struct ContentView: View {
     }
 }
 
-private extension NSImage {
-    var pngData: Data? {
-        guard
-            let tiffRepresentation,
-            let bitmap = NSBitmapImageRep(data: tiffRepresentation)
-        else { return nil }
-
-        return bitmap.representation(using: .png, properties: [:])
-    }
-}
-
-private struct ImageMetadata {
-    let pixelSize: CGSize
-
-    init?(data: Data) {
-        guard
-            let source = CGImageSourceCreateWithData(data as CFData, nil),
-            let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil)
-                as? [CFString: Any],
-            let pixelWidth = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
-            let pixelHeight = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue,
-            pixelWidth > 0,
-            pixelHeight > 0
-        else { return nil }
-
-        let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
-        let swapsDimensions = [5, 6, 7, 8].contains(orientation)
-        pixelSize = swapsDimensions
-            ? CGSize(width: pixelHeight, height: pixelWidth)
-            : CGSize(width: pixelWidth, height: pixelHeight)
-    }
-}
-
 #Preview {
     ContentView()
         .environment(BoardSession())
+        .environment(AttachmentLibrary())
         .modelContainer(for: [BoardCard.self, PinboardBoard.self], inMemory: true)
         .frame(width: 1120, height: 760)
 }
