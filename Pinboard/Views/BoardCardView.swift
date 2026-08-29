@@ -19,7 +19,7 @@ struct BoardCardView: View {
     let isSelected: Bool
     let snapToGrid: Bool
     let gridSize: Double
-    let canvasSize: CGSize
+    let canvasScale: CGFloat
     let onActivate: () -> Void
     let onDuplicate: () -> Void
     let onDelete: () -> Void
@@ -27,6 +27,10 @@ struct BoardCardView: View {
     @State private var isHovering = false
     @State private var showsMarkdownPreview = true
     @State private var isEditingTitle = false
+    @State private var isRecognizingImageText = false
+    @State private var imageOCRFeedback: String?
+    @State private var imageOCRTask: Task<Void, Never>?
+    @State private var loadedPreviewImage: NSImage?
     @FocusState private var focusedField: FocusedField?
     @GestureState private var dragTranslation = CGSize.zero
     @GestureState private var resizeTranslation = CGSize.zero
@@ -37,6 +41,9 @@ struct BoardCardView: View {
     private let noteMinimumHeight: Double = 120
     private let noteTitleBarHeight = PinboardTheme.Controls.cardHeaderHeight
     private let imageMinimumWidth: Double = 80
+    private let imageOCRPreferredWidth: Double = 520
+    private let imageOCRMinimumHeight: Double = 220
+    private let imageOCRPreferredHeight: Double = 300
     private let quickThemes: [CardTheme] = [.indigo, .teal, .amber, .rose]
 
     var body: some View {
@@ -64,8 +71,8 @@ struct BoardCardView: View {
             )
             .onHover { isHovering = $0 }
             .position(
-                x: CGFloat(card.positionX) + dragTranslation.width,
-                y: CGFloat(card.positionY) + dragTranslation.height
+                x: CGFloat(card.positionX) + worldDragTranslation.width,
+                y: CGFloat(card.positionY) + worldDragTranslation.height
             )
             .simultaneousGesture(selectionGesture)
             .zIndex(Double(card.zIndex))
@@ -76,6 +83,9 @@ struct BoardCardView: View {
             }
             .onAppear {
                 normalizeMinimumSize()
+            }
+            .onDisappear {
+                imageOCRTask?.cancel()
             }
             .onChange(of: mode) { _, mode in
                 if mode != .board {
@@ -123,6 +133,23 @@ struct BoardCardView: View {
                             action: toggleMarkdownPreview
                         )
                     }
+                    if card.kind == .image {
+                        if !card.isLocked {
+                            Button(
+                                hasImageOCRText ? "Recognize Text Again" : "Recognize Text",
+                                action: recognizeImageText
+                            )
+                            .disabled(isRecognizingImageText)
+                        }
+                        if hasImageOCRText || card.showsImageOCRSplit {
+                            Button(
+                                card.showsImageOCRSplit
+                                    ? "Show Image Only"
+                                    : "Show Image and Text",
+                                action: toggleImageOCRSplit
+                            )
+                        }
+                    }
                     Button("Duplicate", action: onDuplicate)
                     Divider()
                     Button("Delete", role: .destructive, action: onDelete)
@@ -130,6 +157,22 @@ struct BoardCardView: View {
             }
             .animation(.snappy(duration: 0.18), value: isHovering)
             .animation(.snappy(duration: 0.22), value: card.isCollapsed)
+            .animation(.snappy(duration: 0.20), value: hasImageOCRText)
+            .task(id: imageOCRFeedback) {
+                guard imageOCRFeedback != nil else { return }
+                try? await Task.sleep(for: .seconds(2.4))
+                guard !Task.isCancelled else { return }
+                imageOCRFeedback = nil
+            }
+            .task(id: card.previewImageRelativePath) {
+                loadedPreviewImage = attachmentLibrary.cachedPreviewImage(
+                    relativePath: card.previewImageRelativePath
+                )
+                guard loadedPreviewImage == nil else { return }
+                loadedPreviewImage = await attachmentLibrary.loadPreviewImage(
+                    relativePath: card.previewImageRelativePath
+                )
+            }
     }
 
     @ViewBuilder
@@ -353,78 +396,171 @@ struct BoardCardView: View {
 
     private var imageCardSurface: some View {
         ZStack(alignment: .top) {
-            imageContent
+            imageCardBody
 
             if mode == .board, isHovering {
-                ZStack {
-                    HStack(spacing: 6) {
-                        Image(
-                            systemName: card.isLocked
-                                ? "lock"
-                                : "arrow.up.and.down.and.arrow.left.and.right"
-                        )
-                            .symbolRenderingMode(.monochrome)
-                            .font(.system(size: 11, weight: .medium))
-                            .frame(
-                                width: PinboardTheme.Controls.cardButtonSize,
-                                height: PinboardTheme.Controls.cardButtonSize
-                            )
-                            .contentShape(Rectangle())
-                            .gesture(dragGesture)
-                            .help(card.isLocked ? "Card locked" : "Drag image")
+                imageHoverToolbar
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
 
-                        Spacer(minLength: 8)
-
-                        PinboardIconButton(
-                            systemImage: "trash",
-                            accessibilityLabel: "Delete image",
-                            help: "Delete image",
-                            emphasis: .destructive,
-                            action: onDelete
-                        )
-                    }
-
-                    Group {
-                        if !card.isLocked, isEditingTitle {
-                            TextField("Image title", text: binding(for: \BoardCard.title))
-                                .textFieldStyle(.plain)
-                                .focused($focusedField, equals: .title)
-                                .onSubmit {
-                                    finishTitleEditing()
-                                }
-                        } else {
-                            Text(card.title)
-                                .lineLimit(1)
-                                .contentShape(Rectangle())
-                                .onTapGesture(count: 2, perform: beginTitleEditing)
-                                .help(
-                                    card.isLocked
-                                        ? "Card locked"
-                                        : "Double-click to edit title"
-                                )
-                        }
-                    }
-                    .font(.system(size: 11, weight: .semibold))
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 34)
-                }
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.primary.opacity(0.88))
-                .padding(.horizontal, 5)
-                .frame(height: 24)
-                .background(.ultraThinMaterial.opacity(0.72))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(.white.opacity(0.22), lineWidth: 0.75)
-                }
-                .shadow(color: .black.opacity(0.24), radius: 6, y: 2)
-                .padding(6)
-                .transition(.move(edge: .top).combined(with: .opacity))
+            if mode == .board, isHovering, let imageOCRFeedback {
+                Text(imageOCRFeedback)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.primary.opacity(0.82))
+                    .padding(.horizontal, 9)
+                    .frame(height: 24)
+                    .background(.ultraThinMaterial.opacity(0.82))
+                    .clipShape(Capsule(style: .continuous))
+                    .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .padding(8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .contentShape(Rectangle())
+    }
+
+    private var imageHoverToolbar: some View {
+        HStack(spacing: 2) {
+            Image(
+                systemName: card.isLocked
+                    ? "lock"
+                    : "arrow.up.and.down.and.arrow.left.and.right"
+            )
+                .symbolRenderingMode(.monochrome)
+                .font(.system(size: 11, weight: .medium))
+                .frame(
+                    width: PinboardTheme.Controls.cardButtonSize,
+                    height: PinboardTheme.Controls.cardButtonSize
+                )
+                .contentShape(Rectangle())
+                .gesture(dragGesture)
+                .help(card.isLocked ? "Card locked" : "Drag image")
+
+            Group {
+                if !card.isLocked, isEditingTitle {
+                    TextField("Image title", text: binding(for: \BoardCard.title))
+                        .textFieldStyle(.plain)
+                        .focused($focusedField, equals: .title)
+                        .onSubmit {
+                            finishTitleEditing()
+                        }
+                } else {
+                    Text(card.title)
+                        .lineLimit(1)
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2, perform: beginTitleEditing)
+                        .help(
+                            card.isLocked
+                                ? "Card locked"
+                                : "Double-click to edit title"
+                        )
+                }
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !card.isLocked {
+                if isRecognizingImageText {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .frame(
+                            width: PinboardTheme.Controls.cardButtonSize,
+                            height: PinboardTheme.Controls.cardButtonSize
+                        )
+                        .accessibilityLabel("Recognizing text")
+                } else {
+                    PinboardIconButton(
+                        systemImage: "text.viewfinder",
+                        accessibilityLabel: hasImageOCRText
+                            ? "Recognize text again"
+                            : "Recognize text",
+                        help: hasImageOCRText
+                            ? "Recognize text again"
+                            : "Recognize text in image",
+                        action: recognizeImageText
+                    )
+                }
+            }
+
+            if hasImageOCRText || card.showsImageOCRSplit {
+                PinboardIconButton(
+                    systemImage: "rectangle.split.2x1",
+                    accessibilityLabel: card.showsImageOCRSplit
+                        ? "Show image only"
+                        : "Show image and text",
+                    help: card.showsImageOCRSplit
+                        ? "Show image only"
+                        : "Show image and editable text",
+                    emphasis: card.showsImageOCRSplit ? .active : .standard,
+                    action: toggleImageOCRSplit
+                )
+            }
+
+            PinboardIconButton(
+                systemImage: "trash",
+                accessibilityLabel: "Delete image",
+                help: "Delete image",
+                emphasis: .destructive,
+                action: onDelete
+            )
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(.primary.opacity(0.88))
+        .padding(.horizontal, 5)
+        .frame(height: 24)
+        .background(.ultraThinMaterial.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(.white.opacity(0.22), lineWidth: 0.75)
+        }
+        .shadow(color: .black.opacity(0.24), radius: 6, y: 2)
+        .padding(6)
+    }
+
+    @ViewBuilder
+    private var imageCardBody: some View {
+        if card.showsImageOCRSplit {
+            GeometryReader { geometry in
+                HStack(spacing: 0) {
+                    ZStack {
+                        Color.black.opacity(0.10)
+                        imageContent
+                            .padding(8)
+                    }
+                    .frame(width: max(140, geometry.size.width * 0.5))
+
+                    Rectangle()
+                        .fill(.primary.opacity(0.10))
+                        .frame(width: 1)
+
+                    ZStack(alignment: .topLeading) {
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+
+                        TextEditor(text: binding(for: \BoardCard.imageOCRText))
+                            .font(.system(size: 13))
+                            .scrollContentBackground(.hidden)
+                            .padding(.horizontal, 8)
+                            .padding(.top, 28)
+                            .padding(.bottom, 7)
+                            .allowsHitTesting(mode == .board && !card.isLocked)
+
+                        if card.imageOCRText.isEmpty {
+                            Text("Recognized text")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.tertiary)
+                                .padding(.leading, 13)
+                                .padding(.top, 35)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                }
+            }
+        } else {
+            imageContent
+        }
     }
 
     @ViewBuilder
@@ -808,6 +944,14 @@ struct BoardCardView: View {
         max(0.01, card.imageHeightToWidthRatio ?? (card.height / max(1, card.width)))
     }
 
+    private var hasImageOCRText: Bool {
+        !card.imageOCRText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var imageOCRMinimumWidth: Double {
+        480
+    }
+
     private var linkHost: String? {
         guard
             let sourceURLString = card.sourceURLString,
@@ -862,7 +1006,22 @@ struct BoardCardView: View {
     }
 
     private var displayedCardSize: CGSize {
+        let resizeTranslation = worldResizeTranslation
+
         if card.kind == .image {
+            if card.showsImageOCRSplit {
+                return CGSize(
+                    width: max(
+                        imageOCRMinimumWidth,
+                        card.width + Double(resizeTranslation.width)
+                    ),
+                    height: max(
+                        imageOCRMinimumHeight,
+                        card.height + Double(resizeTranslation.height)
+                    )
+                )
+            }
+
             let ratio = imageHeightToWidthRatio
             let widthChange: Double
             if abs(resizeTranslation.width) >= abs(resizeTranslation.height) {
@@ -896,16 +1055,9 @@ struct BoardCardView: View {
             .onEnded { value in
                 guard mode == .board, !card.isLocked else { return }
 
-                let proposedX = card.positionX + Double(value.translation.width)
-                let proposedY = card.positionY + Double(value.translation.height)
-                let displayedSize = displayedCardSize
-                let halfWidth = Double(displayedSize.width) / 2
-                let halfHeight = Double(displayedSize.height) / 2
-                let maximumX = max(halfWidth, Double(canvasSize.width) - halfWidth)
-                let maximumY = max(halfHeight, Double(canvasSize.height) - halfHeight)
-
-                card.positionX = min(max(snapped(proposedX), halfWidth), maximumX)
-                card.positionY = min(max(snapped(proposedY), halfHeight), maximumY)
+                let translation = worldTranslation(value.translation)
+                card.positionX = snapped(card.positionX + Double(translation.width))
+                card.positionY = snapped(card.positionY + Double(translation.height))
                 card.updatedAt = .now
             }
     }
@@ -931,29 +1083,40 @@ struct BoardCardView: View {
                 state = true
             }
             .onEnded { value in
+                let translation = worldTranslation(value.translation)
                 if card.kind == .image {
-                    let ratio = imageHeightToWidthRatio
-                    let widthChange: Double
-                    if abs(value.translation.width) >= abs(value.translation.height) {
-                        widthChange = Double(value.translation.width)
+                    if card.showsImageOCRSplit {
+                        card.width = max(
+                            imageOCRMinimumWidth,
+                            snapped(card.width + Double(translation.width))
+                        )
+                        card.height = max(
+                            imageOCRMinimumHeight,
+                            snapped(card.height + Double(translation.height))
+                        )
                     } else {
-                        widthChange = Double(value.translation.height) / ratio
-                    }
+                        let ratio = imageHeightToWidthRatio
+                        let widthChange: Double
+                        if abs(translation.width) >= abs(translation.height) {
+                            widthChange = Double(translation.width)
+                        } else {
+                            widthChange = Double(translation.height) / ratio
+                        }
 
-                    let width = max(imageMinimumWidth, snapped(card.width + widthChange))
-                    card.width = width
-                    card.height = width * ratio
+                        let width = max(imageMinimumWidth, snapped(card.width + widthChange))
+                        card.width = width
+                        card.height = width * ratio
+                    }
                 } else {
                     card.width = max(
                         noteMinimumWidth,
-                        snapped(card.width + Double(value.translation.width))
+                        snapped(card.width + Double(translation.width))
                     )
                     card.height = max(
                         noteMinimumHeight,
-                        snapped(card.height + Double(value.translation.height))
+                        snapped(card.height + Double(translation.height))
                     )
                 }
-                clampCardPosition(width: card.width, height: card.height)
                 card.updatedAt = .now
             }
     }
@@ -992,11 +1155,9 @@ struct BoardCardView: View {
         if card.isCollapsed {
             card.positionY += heightDifference
             card.isCollapsed = false
-            clampCardPosition(width: card.width, height: card.height)
         } else {
             card.positionY -= heightDifference
             card.isCollapsed = true
-            clampCardPosition(width: card.width, height: Double(noteTitleBarHeight))
         }
         card.updatedAt = .now
     }
@@ -1008,6 +1169,68 @@ struct BoardCardView: View {
             focusedField = nil
         } else {
             focusedField = .content
+        }
+    }
+
+    private func recognizeImageText() {
+        guard card.kind == .image, !card.isLocked, !isRecognizingImageText else { return }
+        activateCard()
+        imageOCRTask?.cancel()
+        imageOCRFeedback = nil
+        isRecognizingImageText = true
+
+        imageOCRTask = Task { @MainActor in
+            defer {
+                isRecognizingImageText = false
+                imageOCRTask = nil
+            }
+
+            do {
+                let result = try await attachmentLibrary.recognizeImageText(
+                    attachmentRelativePath: card.attachmentRelativePath,
+                    previewRelativePath: card.previewImageRelativePath,
+                    sourceBookmark: card.sourceFileBookmark
+                )
+                try Task.checkCancellation()
+
+                card.imageOCRText = result.text
+                if let refreshedBookmark = result.refreshedBookmark {
+                    card.sourceFileBookmark = refreshedBookmark
+                }
+                card.updatedAt = .now
+                imageOCRFeedback = "Text recognized"
+            } catch is CancellationError {
+                return
+            } catch ImageTextRecognizerError.noReadableText {
+                imageOCRFeedback = "No readable text found"
+            } catch {
+                imageOCRFeedback = "Could not recognize text"
+            }
+        }
+    }
+
+    private func toggleImageOCRSplit() {
+        guard card.kind == .image, hasImageOCRText || card.showsImageOCRSplit else { return }
+        activateCard()
+        isEditingTitle = false
+        focusedField = nil
+
+        withAnimation(.snappy(duration: 0.22)) {
+            if card.showsImageOCRSplit {
+                card.showsImageOCRSplit = false
+
+                let ratio = imageHeightToWidthRatio
+                let width = max(imageMinimumWidth, card.width)
+                let height = width * ratio
+                card.width = width
+                card.height = height
+            } else {
+                card.showsImageOCRSplit = true
+                card.width = max(card.width, imageOCRPreferredWidth)
+                card.height = max(card.height, imageOCRPreferredHeight)
+            }
+
+            card.updatedAt = .now
         }
     }
 
@@ -1056,7 +1279,9 @@ struct BoardCardView: View {
     }
 
     private var resolvedPreviewImage: NSImage? {
-        attachmentLibrary.previewImage(relativePath: card.previewImageRelativePath)
+        loadedPreviewImage ?? attachmentLibrary.cachedPreviewImage(
+            relativePath: card.previewImageRelativePath
+        )
     }
 
     private func formattedFileSize(_ bytes: Int64) -> String {
@@ -1065,20 +1290,22 @@ struct BoardCardView: View {
 
     private func normalizeMinimumSize() {
         if card.kind == .image {
-            let ratio = imageHeightToWidthRatio
-            var width = max(imageMinimumWidth, card.width)
-            var height = width * ratio
-            let maximumWidth = max(imageMinimumWidth, Double(canvasSize.width) - 24)
-            let maximumHeight = max(48, Double(canvasSize.height) - 24)
+            if card.showsImageOCRSplit {
+                let width = max(imageOCRMinimumWidth, card.width)
+                let height = max(imageOCRMinimumHeight, card.height)
+                guard abs(card.width - width) > 0.5 || abs(card.height - height) > 0.5 else {
+                    return
+                }
 
-            if width > maximumWidth {
-                width = maximumWidth
-                height = width * ratio
+                card.width = width
+                card.height = height
+                card.updatedAt = .now
+                return
             }
-            if height > maximumHeight {
-                height = maximumHeight
-                width = height / ratio
-            }
+
+            let ratio = imageHeightToWidthRatio
+            let width = max(imageMinimumWidth, card.width)
+            let height = width * ratio
 
             guard abs(card.width - width) > 0.5 || abs(card.height - height) > 0.5 else {
                 return
@@ -1086,7 +1313,6 @@ struct BoardCardView: View {
 
             card.width = width
             card.height = height
-            clampCardPosition(width: width, height: height)
             card.updatedAt = .now
             return
         }
@@ -1098,20 +1324,23 @@ struct BoardCardView: View {
         card.width = max(noteMinimumWidth, card.width)
         card.height = max(noteMinimumHeight, card.height)
         card.opacity = 1
-        clampCardPosition(
-            width: card.width,
-            height: card.isCollapsed ? Double(noteTitleBarHeight) : card.height
-        )
         card.updatedAt = .now
     }
 
-    private func clampCardPosition(width: Double, height: Double) {
-        let halfWidth = width / 2
-        let halfHeight = height / 2
-        let maximumX = max(halfWidth, Double(canvasSize.width) - halfWidth)
-        let maximumY = max(halfHeight, Double(canvasSize.height) - halfHeight)
-        card.positionX = min(max(card.positionX, halfWidth), maximumX)
-        card.positionY = min(max(card.positionY, halfHeight), maximumY)
+    private var worldDragTranslation: CGSize {
+        worldTranslation(dragTranslation)
+    }
+
+    private var worldResizeTranslation: CGSize {
+        worldTranslation(resizeTranslation)
+    }
+
+    private func worldTranslation(_ translation: CGSize) -> CGSize {
+        let scale = max(canvasScale, 0.01)
+        return CGSize(
+            width: translation.width / scale,
+            height: translation.height / scale
+        )
     }
 
     private func binding(for keyPath: ReferenceWritableKeyPath<BoardCard, String>) -> Binding<String> {

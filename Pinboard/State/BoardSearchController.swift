@@ -107,7 +107,9 @@ final class BoardSearchController {
                     id: $0.id,
                     kindRawValue: $0.kindRawValue,
                     title: $0.title,
-                    content: $0.content,
+                    content: [$0.content, $0.imageOCRText]
+                        .filter { !$0.isEmpty }
+                        .joined(separator: "\n"),
                     updatedAt: $0.updatedAt
                 )
             }

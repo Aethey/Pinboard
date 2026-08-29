@@ -49,7 +49,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				Pinboard.entitlements,
 			);
 			target = 12AF63CA3040415E009C8856 /* Pinboard */;
 		};

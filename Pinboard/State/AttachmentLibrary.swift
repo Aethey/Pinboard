@@ -25,6 +25,11 @@ struct StoredPreviewImage: Sendable {
     let pixelSize: CGSize
 }
 
+struct ImageOCRResult: Sendable {
+    let text: String
+    let refreshedBookmark: Data?
+}
+
 @MainActor
 @Observable
 final class AttachmentLibrary {
@@ -32,6 +37,7 @@ final class AttachmentLibrary {
     private let legacyRootURL: URL?
     private let previewCache = NSCache<NSString, NSImage>()
     private let previewThemeColorCache = NSCache<NSString, NSColor>()
+    private var previewLoadTasks: [String: Task<NSImage?, Never>] = [:]
 
     private static let bookmarkKey = "attachmentLibraryBookmark"
     private static let libraryFolderName = "Pinboard Library"
@@ -122,36 +128,53 @@ final class AttachmentLibrary {
         }.value
     }
 
-    func previewImage(relativePath: String?) -> NSImage? {
+    func cachedPreviewImage(relativePath: String?) -> NSImage? {
         guard let relativePath else { return nil }
         let cacheKey = "\(locationIdentifier)|\(relativePath)" as NSString
-        if let cachedImage = previewCache.object(forKey: cacheKey) {
+        return previewCache.object(forKey: cacheKey)
+    }
+
+    func loadPreviewImage(relativePath: String?) async -> NSImage? {
+        guard let relativePath else { return nil }
+        if let cachedImage = cachedPreviewImage(relativePath: relativePath) {
             return cachedImage
         }
 
-        let internalImage = AttachmentFileIO.loadPreviewImage(
-            relativePath: relativePath,
-            root: rootURL
-        )
-        if let image = internalImage {
-            previewCache.setObject(image, forKey: cacheKey)
+        let cacheIdentifier = "\(locationIdentifier)|\(relativePath)"
+        let cacheKey = cacheIdentifier as NSString
+        if let existingTask = previewLoadTasks[cacheIdentifier] {
+            let image = await existingTask.value
+            if let image {
+                previewCache.setObject(image, forKey: cacheKey)
+            }
             return image
         }
 
-        if let legacyRootURL {
-            let access = legacyRootURL.startAccessingSecurityScopedResource()
-            let image = AttachmentFileIO.loadPreviewImage(
-                relativePath: relativePath,
-                root: legacyRootURL
-            )
-            if access { legacyRootURL.stopAccessingSecurityScopedResource() }
-
-            if let image {
-                previewCache.setObject(image, forKey: cacheKey)
-                return image
+        let managedRoots = [rootURL, legacyRootURL].compactMap { $0 }
+        let rootAccesses = managedRoots.map { $0.startAccessingSecurityScopedResource() }
+        let task: Task<NSImage?, Never> = Task.detached(priority: .utility) {
+            for managedRoot in managedRoots {
+                if let image = AttachmentFileIO.loadPreviewImage(
+                    relativePath: relativePath,
+                    root: managedRoot
+                ) {
+                    return image
+                }
             }
+            return nil
         }
-        return nil
+        previewLoadTasks[cacheIdentifier] = task
+
+        let image = await task.value
+        previewLoadTasks[cacheIdentifier] = nil
+        for (managedRoot, hasAccess) in zip(managedRoots, rootAccesses) where hasAccess {
+            managedRoot.stopAccessingSecurityScopedResource()
+        }
+
+        if let image {
+            previewCache.setObject(image, forKey: cacheKey)
+        }
+        return image
     }
 
     func previewThemeColor(relativePath: String?) -> NSColor? {
@@ -162,12 +185,68 @@ final class AttachmentLibrary {
         }
 
         guard
-            let image = previewImage(relativePath: relativePath),
+            let image = cachedPreviewImage(relativePath: relativePath),
             let color = AttachmentFileIO.representativeColor(from: image)
         else { return nil }
 
         previewThemeColorCache.setObject(color, forKey: cacheKey)
         return color
+    }
+
+    func recognizeImageText(
+        attachmentRelativePath: String?,
+        previewRelativePath: String?,
+        sourceBookmark: Data?
+    ) async throws -> ImageOCRResult {
+        if let sourceBookmark,
+           let resolved = resolveExternalAttachment(from: sourceBookmark) {
+            let access = resolved.url.startAccessingSecurityScopedResource()
+            defer {
+                if access { resolved.url.stopAccessingSecurityScopedResource() }
+            }
+
+            do {
+                let text = try await ImageTextRecognizer.recognizeText(at: resolved.url)
+                return ImageOCRResult(
+                    text: text,
+                    refreshedBookmark: resolved.refreshedBookmark
+                )
+            } catch ImageTextRecognizerError.noReadableText {
+                throw ImageTextRecognizerError.noReadableText
+            } catch {
+                // The original file may have moved. Fall back to Pinboard's
+                // lightweight managed preview below when it is still available.
+            }
+        }
+
+        let relativePaths = [attachmentRelativePath, previewRelativePath].compactMap { $0 }
+        for managedRoot in [rootURL, legacyRootURL].compactMap({ $0 }) {
+            let rootAccess = managedRoot.startAccessingSecurityScopedResource()
+            defer {
+                if rootAccess { managedRoot.stopAccessingSecurityScopedResource() }
+            }
+
+            for relativePath in relativePaths {
+                guard
+                    let fileURL = AttachmentFileIO.fileURL(
+                        relativePath: relativePath,
+                        root: managedRoot
+                    ),
+                    FileManager.default.fileExists(atPath: fileURL.path)
+                else { continue }
+
+                do {
+                    let text = try await ImageTextRecognizer.recognizeText(at: fileURL)
+                    return ImageOCRResult(text: text, refreshedBookmark: nil)
+                } catch ImageTextRecognizerError.noReadableText {
+                    throw ImageTextRecognizerError.noReadableText
+                } catch {
+                    continue
+                }
+            }
+        }
+
+        throw ImageTextRecognizerError.imageUnavailable
     }
 
     @discardableResult

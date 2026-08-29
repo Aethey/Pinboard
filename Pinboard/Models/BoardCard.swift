@@ -135,6 +135,8 @@ final class BoardCard {
     @Attribute(.externalStorage) var imageData: Data?
     var imagePixelWidth: Double?
     var imagePixelHeight: Double?
+    var imageOCRText: String = ""
+    var showsImageOCRSplit: Bool = false
     var attachmentRelativePath: String?
     var sourceFileBookmark: Data?
     var previewImageRelativePath: String?
@@ -167,6 +169,8 @@ final class BoardCard {
         imageData: Data? = nil,
         imagePixelWidth: Double? = nil,
         imagePixelHeight: Double? = nil,
+        imageOCRText: String = "",
+        showsImageOCRSplit: Bool = false,
         attachmentRelativePath: String? = nil,
         sourceFileBookmark: Data? = nil,
         previewImageRelativePath: String? = nil,
@@ -198,6 +202,8 @@ final class BoardCard {
         self.imageData = imageData
         self.imagePixelWidth = imagePixelWidth
         self.imagePixelHeight = imagePixelHeight
+        self.imageOCRText = imageOCRText
+        self.showsImageOCRSplit = showsImageOCRSplit
         self.attachmentRelativePath = attachmentRelativePath
         self.sourceFileBookmark = sourceFileBookmark
         self.previewImageRelativePath = previewImageRelativePath
