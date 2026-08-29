@@ -12,6 +12,7 @@ enum PinboardDeepLink {
     private static let maximumPayloadBytes = 64 * 1_024
     private static let maximumTitleLength = 200
     private static let maximumContentLength = 20_000
+    private static let maximumSourceURLLength = 2_048
 
     static func creationRequest(from url: URL) throws -> BoardCardCreationRequest {
         guard
@@ -39,7 +40,7 @@ enum PinboardDeepLink {
 
         guard
             let kind = CardKind(rawValue: payload.kind),
-            kind == .text || kind == .markdown,
+            kind == .text || kind == .markdown || kind == .chat,
             payload.title?.count ?? 0 <= maximumTitleLength,
             payload.content.count <= maximumContentLength
         else {
@@ -66,13 +67,45 @@ enum PinboardDeepLink {
             theme = nil
         }
 
+        let sourceURL: URL?
+        if let sourceURLString = payload.sourceURL {
+            guard
+                sourceURLString.count <= maximumSourceURLLength,
+                let parsedURL = URL(string: sourceURLString),
+                let scheme = parsedURL.scheme?.lowercased(),
+                scheme == "https" || scheme == "http",
+                parsedURL.host() != nil
+            else {
+                throw PinboardDeepLinkError.invalidNote
+            }
+            sourceURL = parsedURL
+        } else {
+            sourceURL = nil
+        }
+
+        let chatProvider: ChatProvider?
+        if kind == .chat {
+            if let rawProvider = payload.chatProvider {
+                guard let parsedProvider = ChatProvider(rawValue: rawProvider) else {
+                    throw PinboardDeepLinkError.invalidNote
+                }
+                chatProvider = parsedProvider
+            } else {
+                chatProvider = ChatProvider.inferred(from: sourceURL)
+            }
+        } else {
+            chatProvider = nil
+        }
+
         return BoardCardCreationRequest(
             id: payload.id,
             kind: kind,
             title: payload.title,
             content: payload.content,
             position: position,
-            theme: theme
+            theme: theme,
+            chatProvider: chatProvider,
+            sourceURL: sourceURL
         )
     }
 }
@@ -85,6 +118,8 @@ private struct CreateNotePayload: Decodable {
     let x: Double?
     let y: Double?
     let theme: String?
+    let chatProvider: String?
+    let sourceURL: String?
 }
 
 private enum PinboardDeepLinkError: Error {

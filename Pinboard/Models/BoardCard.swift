@@ -10,6 +10,7 @@ import SwiftData
 enum CardKind: String, CaseIterable, Identifiable {
     case text
     case markdown
+    case chat
     case image
     case pdf
     case link
@@ -22,6 +23,8 @@ enum CardKind: String, CaseIterable, Identifiable {
             "Text"
         case .markdown:
             "Markdown"
+        case .chat:
+            "Chat"
         case .image:
             "Image"
         case .pdf:
@@ -31,6 +34,48 @@ enum CardKind: String, CaseIterable, Identifiable {
         }
     }
 
+}
+
+enum ChatProvider: String, CaseIterable, Identifiable {
+    case chatGPT = "chatgpt"
+    case claude
+    case gemini
+    case other
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .chatGPT:
+            "ChatGPT"
+        case .claude:
+            "Claude"
+        case .gemini:
+            "Gemini"
+        case .other:
+            "AI"
+        }
+    }
+
+    static func inferred(from url: URL?) -> ChatProvider {
+        guard let host = url?.host(percentEncoded: false)?.lowercased() else {
+            return .other
+        }
+
+        if host == "chatgpt.com"
+            || host.hasSuffix(".chatgpt.com")
+            || host == "openai.com"
+            || host.hasSuffix(".openai.com") {
+            return .chatGPT
+        }
+        if host == "claude.ai" || host.hasSuffix(".claude.ai") {
+            return .claude
+        }
+        if host == "gemini.google.com" || host == "g.co" || host.hasSuffix(".google.com") {
+            return .gemini
+        }
+        return .other
+    }
 }
 
 enum LinkMetadataState: String {
@@ -94,6 +139,7 @@ final class BoardCard {
     var sourceFileBookmark: Data?
     var previewImageRelativePath: String?
     var sourceURLString: String?
+    var chatProviderRawValue: String = ChatProvider.other.rawValue
     var linkIsVideo: Bool = false
     var linkMetadataStateRawValue: String = LinkMetadataState.ready.rawValue
     var sourceFileName: String?
@@ -125,6 +171,7 @@ final class BoardCard {
         sourceFileBookmark: Data? = nil,
         previewImageRelativePath: String? = nil,
         sourceURLString: String? = nil,
+        chatProvider: ChatProvider = .other,
         linkIsVideo: Bool = false,
         linkMetadataState: LinkMetadataState = .ready,
         sourceFileName: String? = nil,
@@ -155,6 +202,7 @@ final class BoardCard {
         self.sourceFileBookmark = sourceFileBookmark
         self.previewImageRelativePath = previewImageRelativePath
         self.sourceURLString = sourceURLString
+        self.chatProviderRawValue = chatProvider.rawValue
         self.linkIsVideo = linkIsVideo
         self.linkMetadataStateRawValue = linkMetadataState.rawValue
         self.sourceFileName = sourceFileName
@@ -187,6 +235,11 @@ final class BoardCard {
     var fontSize: CardFontSize {
         get { CardFontSize(rawValue: fontSizeRawValue) ?? .medium }
         set { fontSizeRawValue = newValue.rawValue }
+    }
+
+    var chatProvider: ChatProvider {
+        get { ChatProvider(rawValue: chatProviderRawValue) ?? .other }
+        set { chatProviderRawValue = newValue.rawValue }
     }
 
     var linkMetadataState: LinkMetadataState {

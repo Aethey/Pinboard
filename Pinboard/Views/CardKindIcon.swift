@@ -25,6 +25,9 @@ struct CardKindIcon: View {
             case .markdown:
                 Text("M")
                     .font(.system(size: size * 0.56, weight: .black, design: .rounded))
+            case .chat:
+                Image(systemName: "bubble.left.and.text.bubble.right")
+                    .font(.system(size: size * 0.46, weight: .semibold))
             case .image:
                 Image(systemName: "photo")
                     .font(.system(size: size * 0.52, weight: .semibold))

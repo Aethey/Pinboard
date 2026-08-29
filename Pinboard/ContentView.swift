@@ -158,6 +158,11 @@ struct ContentView: View {
             .onOpenURL { url in
                 handleOpenURL(url, canvasSize: geometry.size)
             }
+            .onReceive(NotificationCenter.default.publisher(for: .pinboardOpenDeepLink)) {
+                notification in
+                guard let url = notification.object as? URL else { return }
+                handleOpenURL(url, canvasSize: geometry.size)
+            }
             .task {
                 await resumePendingLinkMetadata(canvasSize: geometry.size)
             }
@@ -321,6 +326,9 @@ struct ContentView: View {
             title: request.title,
             content: request.content,
             boardID: activeBoard?.id,
+            sourceURLString: request.sourceURL?.absoluteString,
+            chatProvider: request.chatProvider
+                ?? ChatProvider.inferred(from: request.sourceURL),
             positionX: position.x,
             positionY: position.y,
             width: cardSize.width,
@@ -720,6 +728,7 @@ struct ContentView: View {
             sourceFileBookmark: card.sourceFileBookmark,
             previewImageRelativePath: card.previewImageRelativePath,
             sourceURLString: card.sourceURLString,
+            chatProvider: card.chatProvider,
             linkIsVideo: card.linkIsVideo,
             linkMetadataState: .ready,
             sourceFileName: card.sourceFileName,
@@ -771,6 +780,8 @@ struct ContentView: View {
             CGSize(width: 320, height: 210)
         case .markdown:
             CGSize(width: 320, height: 240)
+        case .chat:
+            CGSize(width: 440, height: 340)
         case .image:
             CGSize(width: 320, height: 200)
         case .pdf:

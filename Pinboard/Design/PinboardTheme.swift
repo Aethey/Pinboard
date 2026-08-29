@@ -31,6 +31,40 @@ extension CardTheme {
     }
 }
 
+extension ChatProvider {
+    var primaryColor: Color {
+        switch self {
+        case .chatGPT:
+            Color(red: 0.06, green: 0.64, blue: 0.49)
+        case .claude:
+            Color(red: 0.84, green: 0.39, blue: 0.25)
+        case .gemini:
+            Color(red: 0.27, green: 0.49, blue: 0.96)
+        case .other:
+            PinboardTheme.selection
+        }
+    }
+
+    var secondaryColor: Color {
+        switch self {
+        case .gemini:
+            Color(red: 0.66, green: 0.36, blue: 0.91)
+        default:
+            primaryColor
+        }
+    }
+
+    var badgeStyle: AnyShapeStyle {
+        AnyShapeStyle(
+            LinearGradient(
+                colors: [primaryColor, secondaryColor],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+    }
+}
+
 enum PinboardTheme {
     static let canvasTop = Color(red: 0.075, green: 0.082, blue: 0.11)
     static let canvasBottom = Color(red: 0.035, green: 0.039, blue: 0.055)

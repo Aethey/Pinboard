@@ -107,7 +107,7 @@ struct BoardCardView: View {
             }
             .contextMenu {
                 if mode == .board {
-                    if card.kind == .pdf || card.kind == .link {
+                    if canOpenExternalContent {
                         Button("Open", action: openExternalContent)
                         Divider()
                     }
@@ -115,7 +115,9 @@ struct BoardCardView: View {
                     if card.kind != .image {
                         Button(card.isCollapsed ? "Expand" : "Collapse", action: toggleCollapsed)
                     }
-                    if card.kind == .markdown, !card.isCollapsed, !card.isLocked {
+                    if (card.kind == .markdown || card.kind == .chat),
+                       !card.isCollapsed,
+                       !card.isLocked {
                         Button(
                             showsMarkdownPreview ? "Edit Markdown Source" : "Preview Markdown",
                             action: toggleMarkdownPreview
@@ -147,14 +149,7 @@ struct BoardCardView: View {
 
     private var cardHeader: some View {
         HStack(spacing: 7) {
-            CardKindIcon(
-                kind: card.kind,
-                size: PinboardTheme.Controls.cardIconSize,
-                backgroundColor: kindIconBackground,
-                foregroundColor: kindIconForeground,
-                borderColor: kindIconForeground.opacity(0.24)
-            )
-            .help(card.isLocked ? "Card locked" : "Drag card")
+            cardKindBadge
 
             if mode == .board, !card.isLocked, isEditingTitle {
                 TextField("Card title", text: binding(for: \BoardCard.title))
@@ -179,20 +174,16 @@ struct BoardCardView: View {
                 HStack(spacing: 4) {
                     if !card.isCollapsed, !card.isLocked {
                         HStack(spacing: 0) {
-                            if card.kind == .pdf || card.kind == .link {
+                            if canOpenExternalContent {
                                 PinboardIconButton(
                                     systemImage: "arrow.up.forward.app",
-                                    accessibilityLabel: card.kind == .pdf
-                                        ? "Open PDF"
-                                        : "Open link",
-                                    help: card.kind == .pdf
-                                        ? "Open PDF in the default app"
-                                        : "Open link in the browser",
+                                    accessibilityLabel: externalContentOpenLabel,
+                                    help: externalContentOpenHelp,
                                     action: openExternalContent
                                 )
                             }
 
-                            if card.kind == .markdown {
+                            if card.kind == .markdown || card.kind == .chat {
                                 PinboardIconButton(
                                     systemImage: showsMarkdownPreview ? "pencil" : "eye",
                                     accessibilityLabel: showsMarkdownPreview
@@ -206,14 +197,16 @@ struct BoardCardView: View {
                                 )
                             }
 
-                            if card.kind != .link {
+                            if card.kind != .link, card.kind != .chat {
                                 PinboardIconButton(
                                     systemImage: "paintpalette",
                                     accessibilityLabel: "Next color",
                                     help: "Next color",
                                     action: cycleTheme
                                 )
+                            }
 
+                            if card.kind != .link {
                                 PinboardIconButton(
                                     systemImage: "textformat.size",
                                     accessibilityLabel: card.fontSize.title,
@@ -255,10 +248,34 @@ struct BoardCardView: View {
         .foregroundStyle(.primary.opacity(0.84))
         .padding(.horizontal, 9)
         .frame(height: noteTitleBarHeight)
-        .background(.white.opacity(mode == .board ? 0.028 : 0.016))
+        .background(cardHeaderBackground)
         .contentShape(Rectangle())
         .simultaneousGesture(dragGesture)
         .animation(.snappy(duration: 0.22), value: card.isCollapsed)
+    }
+
+    @ViewBuilder
+    private var cardKindBadge: some View {
+        if card.kind == .chat {
+            ChatProviderBadge(provider: card.chatProvider)
+                .help(card.isLocked ? "Card locked" : "Drag chat summary")
+        } else {
+            CardKindIcon(
+                kind: card.kind,
+                size: PinboardTheme.Controls.cardIconSize,
+                backgroundColor: kindIconBackground,
+                foregroundColor: kindIconForeground,
+                borderColor: kindIconForeground.opacity(0.24)
+            )
+            .help(card.isLocked ? "Card locked" : "Drag card")
+        }
+    }
+
+    private var cardHeaderBackground: Color {
+        if card.kind == .chat {
+            return card.chatProvider.primaryColor.opacity(mode == .board ? 0.075 : 0.10)
+        }
+        return .white.opacity(mode == .board ? 0.028 : 0.016)
     }
 
     @ViewBuilder
@@ -267,7 +284,7 @@ struct BoardCardView: View {
         case .text:
             textCardContent
 
-        case .markdown:
+        case .markdown, .chat:
             if !showsMarkdownPreview {
                 TextEditor(text: binding(for: \BoardCard.content))
                     .font(.system(size: card.fontSize.pointSize, design: .monospaced))
@@ -662,6 +679,8 @@ struct BoardCardView: View {
             Color.black.opacity(0.025)
         } else if card.kind == .link {
             linkCardBackground
+        } else if card.kind == .chat {
+            chatCardBackground
         } else {
             cardBackground
         }
@@ -695,6 +714,26 @@ struct BoardCardView: View {
                 .fill(card.theme.color.opacity(mode == .board ? 0.12 : 0.18))
             RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
                 .fill(.black.opacity(mode == .board ? 0.05 : 0.10))
+        }
+    }
+
+    private var chatCardBackground: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            card.chatProvider.primaryColor.opacity(mode == .board ? 0.14 : 0.18),
+                            card.chatProvider.secondaryColor.opacity(mode == .board ? 0.06 : 0.10),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                .fill(.black.opacity(mode == .board ? 0.06 : 0.10))
         }
     }
 
@@ -741,11 +780,18 @@ struct BoardCardView: View {
     }
 
     private var kindIconBackground: Color {
-        card.kind == .link ? linkThemeColor : card.theme.color
+        switch card.kind {
+        case .link:
+            linkThemeColor
+        case .chat:
+            card.chatProvider.primaryColor
+        default:
+            card.theme.color
+        }
     }
 
     private var kindIconForeground: Color {
-        card.kind == .link ? .white : card.theme.highContrastForeground
+        card.kind == .link || card.kind == .chat ? .white : card.theme.highContrastForeground
     }
 
     private var linkThemeColor: Color {
@@ -768,6 +814,51 @@ struct BoardCardView: View {
             let url = URL(string: sourceURLString)
         else { return nil }
         return url.host(percentEncoded: false)
+    }
+
+    private var chatShareURL: URL? {
+        guard
+            card.kind == .chat,
+            let sourceURLString = card.sourceURLString,
+            let url = URL(string: sourceURLString),
+            let scheme = url.scheme?.lowercased(),
+            scheme == "https" || scheme == "http",
+            url.host() != nil
+        else { return nil }
+        return url
+    }
+
+    private var canOpenExternalContent: Bool {
+        switch card.kind {
+        case .pdf, .link:
+            true
+        case .chat:
+            chatShareURL != nil
+        case .text, .markdown, .image:
+            false
+        }
+    }
+
+    private var externalContentOpenLabel: String {
+        switch card.kind {
+        case .pdf:
+            "Open PDF"
+        case .chat:
+            "Open shared chat"
+        default:
+            "Open link"
+        }
+    }
+
+    private var externalContentOpenHelp: String {
+        switch card.kind {
+        case .pdf:
+            "Open PDF in the default app"
+        case .chat:
+            "Open the original shared conversation"
+        default:
+            "Open link in the browser"
+        }
     }
 
     private var displayedCardSize: CGSize {
@@ -957,6 +1048,8 @@ struct BoardCardView: View {
             }
         case .link:
             attachmentLibrary.openWebURL(card.sourceURLString.flatMap(URL.init(string:)))
+        case .chat:
+            attachmentLibrary.openWebURL(chatShareURL)
         case .text, .markdown, .image:
             break
         }

@@ -7,6 +7,8 @@ import AppKit
 
 @MainActor
 final class PinboardApplicationDelegate: NSObject, NSApplicationDelegate {
+    private let mcpBridge = PinboardMCPBridge()
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         guard
             ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1",
@@ -26,6 +28,7 @@ final class PinboardApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        mcpBridge.start()
         applyApplicationIcon()
 
         // SwiftUI may finish configuring the Dock tile after this delegate
@@ -48,4 +51,10 @@ final class PinboardApplicationDelegate: NSObject, NSApplicationDelegate {
         NSApp.applicationIconImage = icon
         NSApp.dockTile.display()
     }
+}
+
+extension Notification.Name {
+    static let pinboardOpenDeepLink = Notification.Name(
+        "rya.Pinboard.received-deep-link"
+    )
 }

@@ -12,6 +12,8 @@ struct BoardCardCreationRequest {
     let content: String
     let position: CGPoint?
     let theme: CardTheme?
+    let chatProvider: ChatProvider?
+    let sourceURL: URL?
 
     init(
         id: UUID = UUID(),
@@ -19,7 +21,9 @@ struct BoardCardCreationRequest {
         title: String? = nil,
         content: String,
         position: CGPoint? = nil,
-        theme: CardTheme? = nil
+        theme: CardTheme? = nil,
+        chatProvider: ChatProvider? = nil,
+        sourceURL: URL? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -27,6 +31,7 @@ struct BoardCardCreationRequest {
         self.content = content
         self.position = position
         self.theme = theme
+        self.chatProvider = chatProvider
+        self.sourceURL = sourceURL
     }
 }
-
