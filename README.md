@@ -34,6 +34,7 @@ There are no folders to organize before you begin. Open a board, put something d
 - **Automatic saving:** your boards, notes, and canvas view remain available the next time you open Pinboard.
 - **No duplicate originals:** images and PDFs normally stay in their original Finder location. Pinboard remembers access and keeps only a lightweight preview; if macOS cannot preserve that access, Pinboard automatically keeps a private fallback copy. Large files never live inside the note database.
 - **AI chat capture:** ask an MCP-compatible agent to save the current conversation. It generates a useful Markdown summary, identifies ChatGPT, Claude, Gemini, Cursor, or Codex, and keeps the original share link when one is available.
+- **AI-generated boards:** describe one goal that needs several notes and let an MCP-compatible agent create the complete Board in one step. Pinboard arranges the cards into a readable grid and fits the initial zoom automatically.
 
 ## Quick guide
 
@@ -59,6 +60,7 @@ There are no folders to organize before you begin. Open a board, put something d
 | Create, switch, or rename a board | Use the board control; double-click its name to rename it |
 | Search notes | Click Search or press `⌘F`; press Return to open the first result |
 | Save the current AI conversation | Say “Save this chat to Pinboard” in a connected AI client |
+| Create a complete Board with AI | Describe the goal and the separate notes you need; the agent creates and arranges them together |
 | Switch Board/Desktop mode | Press `⌥ Space` |
 | Maximize or restore the window | Double-click the top edge of the window |
 
@@ -132,7 +134,26 @@ The MCP tool is named `create_note`.
 
 Images are currently added from inside Pinboard rather than through MCP.
 
-### 6. Save the current chat
+### 6. Create a complete Board with AI
+
+Describe the outcome instead of creating each note yourself:
+
+```text
+I have an interview tomorrow. Create a Pinboard Board with separate cheat sheets for my introduction, development skills, management skills, and questions to ask.
+```
+
+The agent calls `create_board` once, writes the content for every note, and sends the complete Board to Pinboard as one validated operation. Pinboard opens the new Board, arranges the notes in a grid, and chooses an initial zoom that keeps the set easy to scan.
+
+| Parameter | Required | Meaning |
+| --- | --- | --- |
+| `name` | Yes | Board name, up to 80 characters |
+| `notes` | Yes | Between 2 and 24 notes |
+| `notes[].title` | Yes | A concise note title, up to 200 characters |
+| `notes[].content` | Yes | Note body, up to 20,000 characters per note |
+| `notes[].kind` | No | `markdown` (default) or `text` |
+| `notes[].theme` | No | `graphite`, `indigo`, `teal`, `amber`, or `rose` |
+
+### 7. Save the current chat
 
 You only need to say:
 
@@ -154,6 +175,6 @@ The agent is instructed not to ask you for a manual summary or provider selectio
 
 ### MCP troubleshooting
 
-- If the agent cannot find `create_note` or `save_chat`, confirm that `pinboard` appears in its MCP list, then restart the agent or begin a new task so it reloads the updated tool list.
+- If the agent cannot find `create_note`, `create_board`, or `save_chat`, confirm that `pinboard` appears in its MCP list, then restart the agent or begin a new task so it reloads the updated tool list.
 - If Pinboard cannot be opened, confirm that the command points to the helper inside the installed `Pinboard.app`.
 - If you keep more than one copy of Pinboard, point the command to the exact copy you want the agent to use.

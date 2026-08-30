@@ -102,8 +102,7 @@ final class PinboardMCPBridge {
             let value = String(data: data, encoding: .utf8),
             let url = URL(string: value),
             url.scheme?.lowercased() == PinboardDeepLink.scheme,
-            url.host?.lowercased() == PinboardDeepLink.createNoteHost,
-            (try? PinboardDeepLink.creationRequest(from: url)) != nil
+            (try? PinboardDeepLink.request(from: url)) != nil
         else {
             connection.cancel()
             return

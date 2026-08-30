@@ -302,8 +302,74 @@ struct ContentView: View {
     }
 
     private func handleOpenURL(_ url: URL, canvasSize: CGSize) {
-        guard let request = try? PinboardDeepLink.creationRequest(from: url) else { return }
-        insertCard(request, canvasSize: canvasSize)
+        guard let request = try? PinboardDeepLink.request(from: url) else { return }
+
+        switch request {
+        case let .card(card):
+            insertCard(card, canvasSize: canvasSize)
+        case let .board(board):
+            insertBoard(board, canvasSize: canvasSize)
+        }
+    }
+
+    private func insertBoard(
+        _ request: BoardCreationRequest,
+        canvasSize: CGSize
+    ) {
+        if let existingBoard = fetchBoard(id: request.id) {
+            if session.mode != .board {
+                session.mode = .board
+            }
+            selectBoard(existingBoard)
+            return
+        }
+
+        let layout = generatedBoardLayout(
+            for: request.cards,
+            canvasSize: canvasSize
+        )
+        let board = PinboardBoard(
+            id: request.id,
+            name: request.name,
+            sortOrder: (boards.map(\.sortOrder).max() ?? -1) + 1,
+            viewportScale: Double(layout.scale)
+        )
+        modelContext.insert(board)
+
+        let themes = CardTheme.allCases
+        for (index, cardRequest) in request.cards.enumerated() {
+            let cardSize = defaultSize(for: cardRequest.kind)
+            let position = cardRequest.position ?? layout.positions[index]
+            let card = BoardCard(
+                id: cardRequest.id,
+                kind: cardRequest.kind,
+                title: cardRequest.title,
+                content: cardRequest.content,
+                boardID: board.id,
+                sourceURLString: cardRequest.sourceURL?.absoluteString,
+                chatProvider: cardRequest.chatProvider
+                    ?? ChatProvider.inferred(from: cardRequest.sourceURL),
+                positionX: position.x,
+                positionY: position.y,
+                width: cardSize.width,
+                height: cardSize.height,
+                theme: cardRequest.theme ?? themes[index % themes.count],
+                zIndex: index
+            )
+            modelContext.insert(card)
+        }
+
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            return
+        }
+
+        if session.mode != .board {
+            session.mode = .board
+        }
+        selectBoard(board)
     }
 
     private func insertCard(
@@ -774,6 +840,74 @@ struct ContentView: View {
         return viewport.worldPoint(for: screenPoint, in: canvasSize)
     }
 
+    private func generatedBoardLayout(
+        for cards: [BoardCardCreationRequest],
+        canvasSize: CGSize
+    ) -> (positions: [CGPoint], scale: CGFloat) {
+        guard !cards.isEmpty else { return ([], 1) }
+
+        let columnCount = min(
+            4,
+            max(1, Int(ceil(sqrt(Double(cards.count)))))
+        )
+        let rowCount = Int(ceil(Double(cards.count) / Double(columnCount)))
+        let sizes = cards.map { defaultSize(for: $0.kind) }
+        var columnWidths = [CGFloat](repeating: 0, count: columnCount)
+        var rowHeights = [CGFloat](repeating: 0, count: rowCount)
+
+        for (index, size) in sizes.enumerated() {
+            columnWidths[index % columnCount] = max(
+                columnWidths[index % columnCount],
+                size.width
+            )
+            rowHeights[index / columnCount] = max(
+                rowHeights[index / columnCount],
+                size.height
+            )
+        }
+
+        let gap: CGFloat = 32
+        let totalWidth = columnWidths.reduce(0, +)
+            + gap * CGFloat(max(0, columnCount - 1))
+        let totalHeight = rowHeights.reduce(0, +)
+            + gap * CGFloat(max(0, rowCount - 1))
+        let originX = canvasSize.width / 2 - totalWidth / 2
+        let originY = canvasSize.height / 2 - totalHeight / 2
+
+        var columnCenters: [CGFloat] = []
+        var cursorX = originX
+        for width in columnWidths {
+            columnCenters.append(cursorX + width / 2)
+            cursorX += width + gap
+        }
+
+        var rowCenters: [CGFloat] = []
+        var cursorY = originY
+        for height in rowHeights {
+            rowCenters.append(cursorY + height / 2)
+            cursorY += height + gap
+        }
+
+        let positions = cards.indices.map { index in
+            CGPoint(
+                x: columnCenters[index % columnCount],
+                y: rowCenters[index / columnCount]
+            )
+        }
+        let availableWidth = max(320, canvasSize.width - 96)
+        let availableHeight = max(240, canvasSize.height - 160)
+        let fittedScale = min(
+            1,
+            availableWidth / max(1, totalWidth),
+            availableHeight / max(1, totalHeight)
+        )
+        let scale = min(
+            CanvasViewport.maximumScale,
+            max(CanvasViewport.minimumScale, fittedScale)
+        )
+        return (positions, scale)
+    }
+
     private func defaultSize(for kind: CardKind) -> CGSize {
         switch kind {
         case .text:
@@ -896,6 +1030,17 @@ struct ContentView: View {
         var descriptor = FetchDescriptor<BoardCard>(
             predicate: #Predicate { card in
                 card.id == cardID
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func fetchBoard(id: UUID) -> PinboardBoard? {
+        let boardID = id
+        var descriptor = FetchDescriptor<PinboardBoard>(
+            predicate: #Predicate { board in
+                board.id == boardID
             }
         )
         descriptor.fetchLimit = 1

@@ -8,9 +8,13 @@ struct PinboardMCP {
     static func main() async throws {
         let server = Server(
             name: "Pinboard",
-            version: "1.2.0",
+            version: "1.3.0",
             instructions: """
-            Create local notes and save useful AI conversations to the user's Pinboard canvas.
+            Create local notes, complete boards, and useful AI conversation summaries in Pinboard.
+            When one goal naturally needs several separately scannable notes, such as interview
+            preparation, a study pack, or a project plan, use create_board once. Infer a concise
+            board name, split the material into focused notes, and write useful content for every
+            note. Do not call create_note repeatedly or ask the user to build the board manually.
             When the user asks to save, pin, archive, or remember the current chat, do not ask
             them to summarize it manually. Distill the conversation yourself, infer the AI
             provider, generate a useful title, and call save_chat. Include a real share URL only
@@ -20,7 +24,7 @@ struct PinboardMCP {
         )
 
         await server.withMethodHandler(ListTools.self) { _ -> ListTools.Result in
-            ListTools.Result(tools: [createNoteTool, saveChatTool])
+            ListTools.Result(tools: [createNoteTool, createBoardTool, saveChatTool])
         }
 
         await server.withMethodHandler(CallTool.self) { parameters -> CallTool.Result in
@@ -33,6 +37,11 @@ struct PinboardMCP {
                     let note = try CreateNote(arguments: parameters.arguments)
                     url = try note.deepLinkURL()
                     successMessage = "Created \(note.kind) note \(note.id.uuidString) in Pinboard."
+
+                case createBoardTool.name:
+                    let board = try CreateBoard(arguments: parameters.arguments)
+                    url = try board.deepLinkURL()
+                    successMessage = "Created board \"\(board.name)\" with \(board.notes.count) notes in Pinboard."
 
                 case saveChatTool.name:
                     let chat = try SaveChat(arguments: parameters.arguments)
@@ -74,7 +83,7 @@ struct PinboardMCP {
             } catch {
                 return CallTool.Result(
                     content: [.text(
-                        text: "Could not create the Pinboard note: \(error.localizedDescription)",
+                        text: "Could not complete the Pinboard request: \(error.localizedDescription)",
                         annotations: nil,
                         _meta: nil
                     )],
@@ -127,6 +136,67 @@ struct PinboardMCP {
                 ]),
             ]),
             "required": ["content"],
+            "additionalProperties": false,
+        ])
+    )
+
+    private static let createBoardTool = Tool(
+        name: "create_board",
+        description: """
+        Create one new Pinboard Board and a coherent set of notes in a single operation. Use this
+        when a goal is easier to browse as multiple focused cards, for example interview cheat
+        sheets, study topics, project planning, research, or a travel plan. Infer a concise board
+        name and useful note breakdown from the conversation. Populate every note with meaningful
+        content; do not create empty placeholders or call create_note repeatedly. Pinboard arranges
+        the notes automatically.
+        """,
+        inputSchema: .object([
+            "type": "object",
+            "properties": .object([
+                "name": .object([
+                    "type": "string",
+                    "description": "A concise name for the new Board.",
+                    "minLength": 1,
+                    "maxLength": 80,
+                ]),
+                "notes": .object([
+                    "type": "array",
+                    "description": "Two or more focused notes that together cover the user's goal.",
+                    "minItems": 2,
+                    "maxItems": 24,
+                    "items": .object([
+                        "type": "object",
+                        "properties": .object([
+                            "title": .object([
+                                "type": "string",
+                                "description": "A concise, scannable note title.",
+                                "minLength": 1,
+                                "maxLength": 200,
+                            ]),
+                            "content": .object([
+                                "type": "string",
+                                "description": "Useful note content. Markdown is supported.",
+                                "minLength": 1,
+                                "maxLength": 20_000,
+                            ]),
+                            "kind": .object([
+                                "type": "string",
+                                "description": "The note format. Defaults to markdown.",
+                                "enum": ["text", "markdown"],
+                                "default": "markdown",
+                            ]),
+                            "theme": .object([
+                                "type": "string",
+                                "description": "Optional card color theme.",
+                                "enum": ["graphite", "indigo", "teal", "amber", "rose"],
+                            ]),
+                        ]),
+                        "required": ["title", "content"],
+                        "additionalProperties": false,
+                    ]),
+                ]),
+            ]),
+            "required": ["name", "notes"],
             "additionalProperties": false,
         ])
     )
@@ -413,6 +483,122 @@ private struct CreateNote: Encodable {
     }
 }
 
+private struct CreateBoard: Encodable {
+    let id: UUID
+    let name: String
+    let notes: [CreateBoardNote]
+
+    init(arguments: [String: Value]?) throws {
+        let arguments = arguments ?? [:]
+
+        guard let rawName = arguments["name"]?.stringValue else {
+            throw CreateBoardError.missingName
+        }
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            throw CreateBoardError.missingName
+        }
+        guard name.count <= 80 else {
+            throw CreateBoardError.nameTooLong
+        }
+
+        guard let noteValues = arguments["notes"]?.arrayValue,
+              noteValues.count >= 2 else {
+            throw CreateBoardError.missingNotes
+        }
+        guard noteValues.count <= 24 else {
+            throw CreateBoardError.tooManyNotes
+        }
+
+        var notes: [CreateBoardNote] = []
+        notes.reserveCapacity(noteValues.count)
+        for (index, value) in noteValues.enumerated() {
+            guard let noteArguments = value.objectValue else {
+                throw CreateBoardError.invalidNote(index: index + 1, reason: "must be an object")
+            }
+            do {
+                notes.append(try CreateBoardNote(arguments: noteArguments))
+            } catch {
+                throw CreateBoardError.invalidNote(
+                    index: index + 1,
+                    reason: error.localizedDescription
+                )
+            }
+        }
+
+        self.id = UUID()
+        self.name = name
+        self.notes = notes
+    }
+
+    func deepLinkURL() throws -> URL {
+        let payloadData = try JSONEncoder().encode(self)
+        guard payloadData.count <= 64 * 1_024 else {
+            throw CreateBoardError.payloadTooLarge
+        }
+
+        var components = URLComponents()
+        components.scheme = "pinboard"
+        components.host = "create-board"
+        components.queryItems = [
+            URLQueryItem(name: "payload", value: payloadData.base64URLEncodedString())
+        ]
+
+        guard let url = components.url else {
+            throw CreateBoardError.invalidURL
+        }
+        return url
+    }
+}
+
+private struct CreateBoardNote: Encodable {
+    let id: UUID
+    let kind: String
+    let title: String
+    let content: String
+    let theme: String?
+
+    init(arguments: [String: Value]) throws {
+        guard let rawTitle = arguments["title"]?.stringValue else {
+            throw CreateBoardNoteError.missingTitle
+        }
+        let title = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else {
+            throw CreateBoardNoteError.missingTitle
+        }
+        guard title.count <= 200 else {
+            throw CreateBoardNoteError.titleTooLong
+        }
+
+        guard let rawContent = arguments["content"]?.stringValue else {
+            throw CreateBoardNoteError.missingContent
+        }
+        let content = rawContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !content.isEmpty else {
+            throw CreateBoardNoteError.missingContent
+        }
+        guard content.count <= 20_000 else {
+            throw CreateBoardNoteError.contentTooLong
+        }
+
+        let kind = arguments["kind"]?.stringValue ?? "markdown"
+        guard ["text", "markdown"].contains(kind) else {
+            throw CreateBoardNoteError.invalidKind
+        }
+
+        let theme = arguments["theme"]?.stringValue
+        guard theme.map({ ["graphite", "indigo", "teal", "amber", "rose"].contains($0) }) ?? true else {
+            throw CreateBoardNoteError.invalidTheme
+        }
+
+        self.id = UUID()
+        self.kind = kind
+        self.title = title
+        self.content = content
+        self.theme = theme
+    }
+}
+
 private struct SaveChat: Encodable {
     let id: UUID
     let kind = "chat"
@@ -553,6 +739,61 @@ private enum CreateNoteError: LocalizedError {
             "theme must be graphite, indigo, teal, amber, or rose"
         case .invalidURL:
             "the Pinboard URL could not be constructed"
+        }
+    }
+}
+
+private enum CreateBoardError: LocalizedError {
+    case missingName
+    case nameTooLong
+    case missingNotes
+    case tooManyNotes
+    case invalidNote(index: Int, reason: String)
+    case payloadTooLarge
+    case invalidURL
+
+    var errorDescription: String? {
+        switch self {
+        case .missingName:
+            "name is required and must not be empty"
+        case .nameTooLong:
+            "name must contain no more than 80 characters"
+        case .missingNotes:
+            "notes must contain at least two notes"
+        case .tooManyNotes:
+            "notes must contain no more than 24 notes"
+        case let .invalidNote(index, reason):
+            "note \(index) is invalid: \(reason)"
+        case .payloadTooLarge:
+            "the complete Board is too large; shorten the note content and retry"
+        case .invalidURL:
+            "the Pinboard Board URL could not be constructed"
+        }
+    }
+}
+
+private enum CreateBoardNoteError: LocalizedError {
+    case missingTitle
+    case titleTooLong
+    case missingContent
+    case contentTooLong
+    case invalidKind
+    case invalidTheme
+
+    var errorDescription: String? {
+        switch self {
+        case .missingTitle:
+            "title is required and must not be empty"
+        case .titleTooLong:
+            "title must contain no more than 200 characters"
+        case .missingContent:
+            "content is required and must not be empty"
+        case .contentTooLong:
+            "content must contain no more than 20,000 characters"
+        case .invalidKind:
+            "kind must be text or markdown"
+        case .invalidTheme:
+            "theme must be graphite, indigo, teal, amber, or rose"
         }
     }
 }

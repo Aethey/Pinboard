@@ -34,6 +34,7 @@ Pinboard 把屏幕变成一块可以自由摆放的思考空间。临时想法�
 - **自动保存：** 关闭后再次打开，Board、便签和画布视角仍会保留。
 - **不重复保存原文件：** 图片和 PDF 通常继续保留在 Finder 中的原位置，Pinboard 只记住访问权限并生成轻量预览；如果 macOS 无法保留访问权限，才会自动保存一份私有副本。大文件不会进入便签数据库。
 - **AI 对话归档：** 只需让支持 MCP 的 Agent 保存当前对话，它会自动生成 Markdown 摘要、识别 ChatGPT、Claude、Gemini、Cursor 或 Codex，并在已有真实分享链接时一并保存。
+- **AI 生成完整 Board：** 描述一个需要多张便签的目标，支持 MCP 的 Agent 就能一次创建整个 Board。Pinboard 会自动把便签排成易读网格，并调整初始缩放比例。
 
 ## 常用操作
 
@@ -59,6 +60,7 @@ Pinboard 把屏幕变成一块可以自由摆放的思考空间。临时想法�
 | 创建、切换或重命名 Board | 使用 Board 控件；双击名称可以重命名 |
 | 搜索便签 | 点击搜索按钮或按 `⌘F`；按 Return 打开第一条结果 |
 | 保存当前 AI 对话 | 在已连接的 AI 客户端中说“把这段聊天保存到 Pinboard” |
+| 让 AI 创建完整 Board | 描述目标和需要拆分的便签，Agent 会一次创建并自动排列 |
 | 切换 Board / Desktop | 按 `⌥ Space` |
 | 最大化或恢复窗口 | 双击窗口上边缘 |
 
@@ -132,7 +134,26 @@ MCP 工具名是 `create_note`。
 
 目前图片仍然从 Pinboard 内导入，暂不通过 MCP 传入。
 
-### 第六步：保存当前聊天
+### 第六步：让 AI 创建完整 Board
+
+不需要逐张创建便签，直接描述最终目标：
+
+```text
+我明天要参加面试。请创建一个 Pinboard Board，分别准备自我介绍、开发技能、管理技能和反问问题四张小抄。
+```
+
+Agent 会一次调用 `create_board`，自行补全每张便签的内容，然后把整个 Board 作为一个经过完整校验的请求发送给 Pinboard。Pinboard 会打开新 Board、自动排列便签，并选择方便整体浏览的初始缩放比例。
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| `name` | 是 | Board 名称，最多 80 个字符 |
+| `notes` | 是 | 2 至 24 张便签 |
+| `notes[].title` | 是 | 简洁的便签标题，最多 200 个字符 |
+| `notes[].content` | 是 | 便签正文，每张最多 20,000 个字符 |
+| `notes[].kind` | 否 | `markdown`（默认）或 `text` |
+| `notes[].theme` | 否 | `graphite`、`indigo`、`teal`、`amber` 或 `rose` |
+
+### 第七步：保存当前聊天
 
 你只需要说：
 
@@ -154,6 +175,6 @@ MCP 会明确要求 Agent 不向用户索要手写摘要，也不让用户选择
 
 ### MCP 常见问题
 
-- Agent 找不到 `create_note` 或 `save_chat`：确认 MCP 列表中已经出现 `pinboard`，然后重启 Agent 或新建一个任务，让它重新加载工具列表。
+- Agent 找不到 `create_note`、`create_board` 或 `save_chat`：确认 MCP 列表中已经出现 `pinboard`，然后重启 Agent 或新建一个任务，让它重新加载工具列表。
 - Pinboard 无法打开：确认 command 指向已安装 `Pinboard.app` 内部的辅助程序。
 - 电脑中有多个 Pinboard：把 command 指向你希望 Agent 使用的那个应用副本。

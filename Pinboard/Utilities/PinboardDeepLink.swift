@@ -8,20 +8,29 @@ import Foundation
 enum PinboardDeepLink {
     static let scheme = "pinboard"
     static let createNoteHost = "create-note"
+    static let createBoardHost = "create-board"
 
     private static let maximumPayloadBytes = 64 * 1_024
     private static let maximumTitleLength = 200
     private static let maximumContentLength = 20_000
     private static let maximumSourceURLLength = 2_048
 
-    static func creationRequest(from url: URL) throws -> BoardCardCreationRequest {
-        guard
-            url.scheme?.lowercased() == scheme,
-            url.host?.lowercased() == createNoteHost
-        else {
+    static func request(from url: URL) throws -> PinboardCreationRequest {
+        guard url.scheme?.lowercased() == scheme else {
             throw PinboardDeepLinkError.unsupportedURL
         }
 
+        switch url.host?.lowercased() {
+        case createNoteHost:
+            return .card(try cardRequest(from: payloadData(from: url)))
+        case createBoardHost:
+            return .board(try boardRequest(from: payloadData(from: url)))
+        default:
+            throw PinboardDeepLinkError.unsupportedURL
+        }
+    }
+
+    private static func payloadData(from url: URL) throws -> Data {
         guard
             let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
             let encodedPayload = components.queryItems?.first(where: { $0.name == "payload" })?.value,
@@ -30,7 +39,10 @@ enum PinboardDeepLink {
         else {
             throw PinboardDeepLinkError.invalidPayload
         }
+        return payloadData
+    }
 
+    private static func cardRequest(from payloadData: Data) throws -> BoardCardCreationRequest {
         let payload: CreateNotePayload
         do {
             payload = try JSONDecoder().decode(CreateNotePayload.self, from: payloadData)
@@ -38,6 +50,12 @@ enum PinboardDeepLink {
             throw PinboardDeepLinkError.invalidPayload
         }
 
+        return try cardRequest(from: payload)
+    }
+
+    private static func cardRequest(
+        from payload: CreateNotePayload
+    ) throws -> BoardCardCreationRequest {
         guard
             let kind = CardKind(rawValue: payload.kind),
             kind == .text || kind == .markdown || kind == .chat,
@@ -108,6 +126,55 @@ enum PinboardDeepLink {
             sourceURL: sourceURL
         )
     }
+
+    private static func boardRequest(from payloadData: Data) throws -> BoardCreationRequest {
+        let payload: CreateBoardPayload
+        do {
+            payload = try JSONDecoder().decode(CreateBoardPayload.self, from: payloadData)
+        } catch {
+            throw PinboardDeepLinkError.invalidPayload
+        }
+
+        let name = payload.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            !name.isEmpty,
+            name.count <= 80,
+            payload.notes.count >= 2,
+            payload.notes.count <= 24,
+            Set(payload.notes.map(\.id)).count == payload.notes.count
+        else {
+            throw PinboardDeepLinkError.invalidBoard
+        }
+
+        let cards = try payload.notes.map { note -> BoardCardCreationRequest in
+            let title = note.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let content = note.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty, !content.isEmpty else {
+                throw PinboardDeepLinkError.invalidNote
+            }
+
+            return try cardRequest(
+                from: CreateNotePayload(
+                    id: note.id,
+                    kind: note.kind,
+                    title: title,
+                    content: content,
+                    x: nil,
+                    y: nil,
+                    theme: note.theme,
+                    chatProvider: nil,
+                    sourceURL: nil
+                )
+            )
+        }
+
+        return BoardCreationRequest(id: payload.id, name: name, cards: cards)
+    }
+}
+
+enum PinboardCreationRequest {
+    case card(BoardCardCreationRequest)
+    case board(BoardCreationRequest)
 }
 
 private struct CreateNotePayload: Decodable {
@@ -122,10 +189,25 @@ private struct CreateNotePayload: Decodable {
     let sourceURL: String?
 }
 
+private struct CreateBoardPayload: Decodable {
+    let id: UUID
+    let name: String
+    let notes: [CreateBoardNotePayload]
+}
+
+private struct CreateBoardNotePayload: Decodable {
+    let id: UUID
+    let kind: String
+    let title: String
+    let content: String
+    let theme: String?
+}
+
 private enum PinboardDeepLinkError: Error {
     case unsupportedURL
     case invalidPayload
     case invalidNote
+    case invalidBoard
     case invalidPosition
 }
 
