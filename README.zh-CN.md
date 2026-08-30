@@ -6,6 +6,12 @@
 
 ![Pinboard 预览](Image/image1.png)
 
+## 下载
+
+[**下载 Pinboard 1.0 for macOS（.dmg）**](https://github.com/Aethey/Pinboard/releases/latest/download/Pinboard-1.0.dmg)
+
+打开 DMG，然后把 **Pinboard** 拖入“**应用程序**”文件夹。当前版本用于本地体验，暂未进行 Apple 公证。如果 macOS 首次启动时阻止打开，请在“应用程序”中按住 Control 点击 Pinboard，选择“**打开**”，然后再次确认。
+
 Pinboard 把屏幕变成一块可以自由摆放的思考空间。临时想法、资料片段、待办、截图和需要持续关注的信息，都可以放到最合适的位置，并在工作过程中一直保持可见。
 
 你不需要先创建复杂的目录，也不必在层层页面之间切换。打开画板、放下一张便签，然后让空间随着想法自然生长。
