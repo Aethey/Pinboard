@@ -20,6 +20,7 @@ struct BoardToolbar: View {
     let onImportPDF: () -> Void
     let onAddLink: (URL) -> Void
     let onToggleGrid: () -> Void
+    let onResetZoom: () -> Void
     let onToggleMode: () -> Void
 
     @State private var isEditingBoardName = false
@@ -58,6 +59,15 @@ struct BoardToolbar: View {
                 size: PinboardTheme.Controls.toolbarButtonSize,
                 glyphSize: PinboardTheme.Controls.toolbarGlyphSize,
                 action: onToggleGrid
+            )
+
+            PinboardIconButton(
+                systemImage: "1.magnifyingglass",
+                accessibilityLabel: "Reset zoom to 100%",
+                help: "Reset zoom to 100% (⌘0)",
+                size: PinboardTheme.Controls.toolbarButtonSize,
+                glyphSize: PinboardTheme.Controls.toolbarGlyphSize,
+                action: onResetZoom
             )
 
             Button(action: onToggleMode) {

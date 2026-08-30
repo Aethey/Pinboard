@@ -15,6 +15,7 @@ struct InfiniteBoardCanvas: View {
     let canvasSize: CGSize
     let search: BoardSearchController
     let focusRequest: BoardFocusRequest?
+    let zoomResetRequest: BoardZoomResetRequest?
     let onClearSelection: () -> Void
     let onViewportCommitted: (UUID, CanvasViewport) -> Void
     let onCreateTextAtScreenPoint: (CGPoint, CanvasViewport) -> Void
@@ -38,6 +39,7 @@ struct InfiniteBoardCanvas: View {
         canvasSize: CGSize,
         search: BoardSearchController,
         focusRequest: BoardFocusRequest?,
+        zoomResetRequest: BoardZoomResetRequest?,
         onClearSelection: @escaping () -> Void,
         onViewportCommitted: @escaping (UUID, CanvasViewport) -> Void,
         onCreateTextAtScreenPoint: @escaping (CGPoint, CanvasViewport) -> Void,
@@ -55,6 +57,7 @@ struct InfiniteBoardCanvas: View {
         self.canvasSize = canvasSize
         self.search = search
         self.focusRequest = focusRequest
+        self.zoomResetRequest = zoomResetRequest
         self.onClearSelection = onClearSelection
         self.onViewportCommitted = onViewportCommitted
         self.onCreateTextAtScreenPoint = onCreateTextAtScreenPoint
@@ -133,6 +136,10 @@ struct InfiniteBoardCanvas: View {
         .onChange(of: focusRequest) { _, request in
             guard let request, request.boardID == board.id else { return }
             focus(on: request.worldPoint)
+        }
+        .onChange(of: zoomResetRequest) { _, request in
+            guard let request, request.boardID == board.id else { return }
+            resetZoom()
         }
         .onDisappear {
             persistenceTask?.cancel()

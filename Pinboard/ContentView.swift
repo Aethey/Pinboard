@@ -36,6 +36,7 @@ struct ContentView: View {
     @State private var activeCards: [BoardCard] = []
     @State private var activeViewport = CanvasViewport.defaultValue
     @State private var focusRequest: BoardFocusRequest?
+    @State private var zoomResetRequest: BoardZoomResetRequest?
     @FocusState private var isBoardFocused: Bool
 
     private var activeBoardID: UUID? {
@@ -61,6 +62,7 @@ struct ContentView: View {
                         canvasSize: geometry.size,
                         search: search,
                         focusRequest: focusRequest,
+                        zoomResetRequest: zoomResetRequest,
                         onClearSelection: {
                             session.selectedCardID = nil
                             isBoardFocused = true
@@ -106,6 +108,7 @@ struct ContentView: View {
                                 },
                                 onAddLink: { addLink($0, canvasSize: geometry.size) },
                                 onToggleGrid: { session.snapToGrid.toggle() },
+                                onResetZoom: resetActiveBoardZoom,
                                 onToggleMode: session.toggleMode
                             )
                         }
@@ -230,6 +233,7 @@ struct ContentView: View {
         activeCards = []
         activeViewport = CanvasViewport(board: board)
         focusRequest = nil
+        zoomResetRequest = nil
         activeBoardIDString = board.id.uuidString
         session.selectedCardID = nil
     }
@@ -866,6 +870,14 @@ struct ContentView: View {
         board.viewportOffsetY = offsetY
         board.updatedAt = .now
         saveNow()
+    }
+
+    private func resetActiveBoardZoom() {
+        guard let activeBoard else { return }
+        zoomResetRequest = BoardZoomResetRequest(
+            id: UUID(),
+            boardID: activeBoard.id
+        )
     }
 
     private func trackActiveCard(_ card: BoardCard) {

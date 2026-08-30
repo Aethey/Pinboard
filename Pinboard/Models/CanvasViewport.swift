@@ -123,3 +123,8 @@ struct BoardFocusRequest: Equatable {
     let boardID: UUID
     let worldPoint: CGPoint
 }
+
+struct BoardZoomResetRequest: Equatable {
+    let id: UUID
+    let boardID: UUID
+}
