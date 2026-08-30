@@ -40,6 +40,8 @@ enum ChatProvider: String, CaseIterable, Identifiable {
     case chatGPT = "chatgpt"
     case claude
     case gemini
+    case cursor
+    case codex
     case other
 
     var id: String { rawValue }
@@ -52,6 +54,10 @@ enum ChatProvider: String, CaseIterable, Identifiable {
             "Claude"
         case .gemini:
             "Gemini"
+        case .cursor:
+            "Cursor"
+        case .codex:
+            "Codex"
         case .other:
             "AI"
         }
@@ -60,6 +66,21 @@ enum ChatProvider: String, CaseIterable, Identifiable {
     static func inferred(from url: URL?) -> ChatProvider {
         guard let host = url?.host(percentEncoded: false)?.lowercased() else {
             return .other
+        }
+
+        let pathComponents = url?.pathComponents.map { $0.lowercased() } ?? []
+
+        if host == "codex.openai.com"
+            || host.hasSuffix(".codex.openai.com")
+            || ((host == "chatgpt.com" || host.hasSuffix(".chatgpt.com"))
+                && pathComponents.contains("codex")) {
+            return .codex
+        }
+        if host == "cursor.com"
+            || host.hasSuffix(".cursor.com")
+            || host == "cursor.sh"
+            || host.hasSuffix(".cursor.sh") {
+            return .cursor
         }
 
         if host == "chatgpt.com"

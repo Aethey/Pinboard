@@ -33,12 +33,23 @@ struct WindowConfigurator: NSViewRepresentable {
             guard let window = view.window else { return }
 
             coordinator.startMonitoring(window: window)
-            window.isOpaque = false
-            window.backgroundColor = .clear
+            if mode == .board {
+                window.isOpaque = true
+                window.backgroundColor = NSColor(
+                    srgbRed: 0.075,
+                    green: 0.082,
+                    blue: 0.11,
+                    alpha: 1
+                )
+                window.hasShadow = true
+            } else {
+                window.isOpaque = false
+                window.backgroundColor = .clear
+                window.hasShadow = false
+            }
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.isMovableByWindowBackground = false
-            window.hasShadow = false
             window.collectionBehavior = [.managed, .fullScreenNone]
             window.level = mode == .desktop ? .floating : .normal
             window.ignoresMouseEvents = mode == .desktop

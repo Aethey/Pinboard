@@ -27,7 +27,10 @@ struct InfiniteBoardCanvas: View {
     @State private var viewport: CanvasViewport
     @State private var panStartViewport: CanvasViewport?
     @State private var magnifyStartViewport: CanvasViewport?
+    @State private var isScrollNavigating = false
+    @State private var isDirectlyNavigating = false
     @State private var persistenceTask: Task<Void, Never>?
+    @State private var interactionEndTask: Task<Void, Never>?
 
     init(
         board: PinboardBoard,
@@ -88,6 +91,7 @@ struct InfiniteBoardCanvas: View {
                 isEnabled: mode == .board,
                 topExclusion: 86,
                 excludedRects: visibleCardRects,
+                onInteractionChanged: { isScrollNavigating = $0 },
                 onScroll: handleScroll
             )
             .frame(width: canvasSize.width, height: canvasSize.height)
@@ -102,6 +106,7 @@ struct InfiniteBoardCanvas: View {
                 gridSize: gridSize,
                 canvasSize: canvasSize,
                 canvasViewport: effectiveViewport,
+                isCanvasNavigating: isCanvasNavigating,
                 search: search,
                 onCardsChanged: onCardsChanged,
                 onActivate: onActivate,
@@ -143,11 +148,16 @@ struct InfiniteBoardCanvas: View {
         }
         .onDisappear {
             persistenceTask?.cancel()
+            interactionEndTask?.cancel()
         }
     }
 
     private var effectiveViewport: CanvasViewport {
         viewport
+    }
+
+    private var isCanvasNavigating: Bool {
+        isScrollNavigating || isDirectlyNavigating
     }
 
     private var doubleClickGesture: some Gesture {
@@ -164,6 +174,7 @@ struct InfiniteBoardCanvas: View {
                 guard mode == .board else { return }
                 if panStartViewport == nil {
                     panStartViewport = viewport
+                    beginDirectNavigation()
                 }
                 guard let panStartViewport else { return }
                 viewport = panStartViewport.translated(by: value.translation)
@@ -171,6 +182,7 @@ struct InfiniteBoardCanvas: View {
             .onEnded { _ in
                 guard mode == .board else { return }
                 panStartViewport = nil
+                endDirectNavigation()
                 commitViewport()
             }
     }
@@ -181,6 +193,7 @@ struct InfiniteBoardCanvas: View {
                 guard mode == .board else { return }
                 if magnifyStartViewport == nil {
                     magnifyStartViewport = viewport
+                    beginDirectNavigation()
                 }
                 guard let magnifyStartViewport else { return }
                 viewport = magnifyStartViewport.zoomed(
@@ -192,6 +205,7 @@ struct InfiniteBoardCanvas: View {
             .onEnded { _ in
                 guard mode == .board else { return }
                 magnifyStartViewport = nil
+                endDirectNavigation()
                 commitViewport()
             }
     }
@@ -209,6 +223,21 @@ struct InfiniteBoardCanvas: View {
             viewport = viewport.translated(by: event.translation)
         }
         scheduleViewportCommit()
+    }
+
+    private func beginDirectNavigation() {
+        interactionEndTask?.cancel()
+        interactionEndTask = nil
+        isDirectlyNavigating = true
+    }
+
+    private func endDirectNavigation() {
+        interactionEndTask?.cancel()
+        interactionEndTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(120))
+            guard !Task.isCancelled else { return }
+            isDirectlyNavigating = false
+        }
     }
 
     private func zoom(by factor: CGFloat) {

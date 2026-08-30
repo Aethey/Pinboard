@@ -8,7 +8,7 @@ struct PinboardMCP {
     static func main() async throws {
         let server = Server(
             name: "Pinboard",
-            version: "1.1.0",
+            version: "1.2.0",
             instructions: """
             Create local notes and save useful AI conversations to the user's Pinboard canvas.
             When the user asks to save, pin, archive, or remember the current chat, do not ask
@@ -164,10 +164,10 @@ struct PinboardMCP {
                     "type": "string",
                     "description": """
                     Infer this from the current AI client: chatgpt for ChatGPT or OpenAI,
-                    claude for Anthropic Claude, gemini for Google Gemini, otherwise other.
-                    Do not ask the user to choose it.
+                    claude for Anthropic Claude, gemini for Google Gemini, cursor for Cursor,
+                    codex for Codex, otherwise other. Do not ask the user to choose it.
                     """,
-                    "enum": ["chatgpt", "claude", "gemini", "other"],
+                    "enum": ["chatgpt", "claude", "gemini", "cursor", "codex", "other"],
                 ]),
                 "share_url": .object([
                     "type": "string",
@@ -432,6 +432,10 @@ private struct SaveChat: Encodable {
             "Claude"
         case "gemini":
             "Gemini"
+        case "cursor":
+            "Cursor"
+        case "codex":
+            "Codex"
         default:
             "AI"
         }
@@ -463,7 +467,7 @@ private struct SaveChat: Encodable {
         }
 
         guard let provider = arguments["provider"]?.stringValue,
-              ["chatgpt", "claude", "gemini", "other"].contains(provider) else {
+              ["chatgpt", "claude", "gemini", "cursor", "codex", "other"].contains(provider) else {
             throw SaveChatError.invalidProvider
         }
 
@@ -575,7 +579,7 @@ private enum SaveChatError: LocalizedError {
         case .summaryTooLong:
             "summary_markdown must contain no more than 20,000 characters"
         case .invalidProvider:
-            "provider must be chatgpt, claude, gemini, or other"
+            "provider must be chatgpt, claude, gemini, cursor, codex, or other"
         case .invalidShareURL:
             "share_url must be a valid HTTP(S) URL no longer than 2,048 characters"
         case .incompletePosition:

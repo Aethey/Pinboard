@@ -16,6 +16,7 @@ struct CanvasScrollMonitor: NSViewRepresentable {
     let isEnabled: Bool
     let topExclusion: CGFloat
     let excludedRects: [CGRect]
+    let onInteractionChanged: (Bool) -> Void
     let onScroll: (CanvasScrollEvent) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -29,10 +30,13 @@ struct CanvasScrollMonitor: NSViewRepresentable {
     }
 
     func updateNSView(_ view: CanvasMonitorView, context: Context) {
-        context.coordinator.isEnabled = isEnabled
-        context.coordinator.topExclusion = topExclusion
-        context.coordinator.excludedRects = excludedRects
-        context.coordinator.onScroll = onScroll
+        context.coordinator.update(
+            isEnabled: isEnabled,
+            topExclusion: topExclusion,
+            excludedRects: excludedRects,
+            onInteractionChanged: onInteractionChanged,
+            onScroll: onScroll
+        )
     }
 
     static func dismantleNSView(_ view: CanvasMonitorView, coordinator: Coordinator) {
@@ -41,13 +45,47 @@ struct CanvasScrollMonitor: NSViewRepresentable {
 
     @MainActor
     final class Coordinator {
+        private enum ScrollOwner {
+            case canvas
+            case card
+        }
+
         weak var view: CanvasMonitorView?
-        var isEnabled = false
-        var topExclusion: CGFloat = 0
-        var excludedRects: [CGRect] = []
-        var onScroll: ((CanvasScrollEvent) -> Void)?
+
+        private var isEnabled = false
+        private var topExclusion: CGFloat = 0
+        private var excludedRects: [CGRect] = []
+        private var onInteractionChanged: ((Bool) -> Void)?
+        private var onScroll: ((CanvasScrollEvent) -> Void)?
 
         private var monitor: Any?
+        private var scrollOwner: ScrollOwner?
+        private var interactionEndTask: Task<Void, Never>?
+        private var isCanvasInteractionActive = false
+
+        private let interactionSettleDelay = Duration.milliseconds(120)
+
+        func update(
+            isEnabled: Bool,
+            topExclusion: CGFloat,
+            excludedRects: [CGRect],
+            onInteractionChanged: @escaping (Bool) -> Void,
+            onScroll: @escaping (CanvasScrollEvent) -> Void
+        ) {
+            let shouldEndInteraction = self.isEnabled && !isEnabled
+            self.isEnabled = isEnabled
+            self.topExclusion = topExclusion
+            self.excludedRects = excludedRects
+            self.onInteractionChanged = onInteractionChanged
+            self.onScroll = onScroll
+
+            if shouldEndInteraction {
+                Task { @MainActor [weak self] in
+                    guard let self, !self.isEnabled else { return }
+                    self.finishInteraction()
+                }
+            }
+        }
 
         func attach(to view: CanvasMonitorView) {
             self.view = view
@@ -58,6 +96,7 @@ struct CanvasScrollMonitor: NSViewRepresentable {
         }
 
         func detach() {
+            finishInteraction(notify: false)
             if let monitor {
                 NSEvent.removeMonitor(monitor)
             }
@@ -74,10 +113,20 @@ struct CanvasScrollMonitor: NSViewRepresentable {
             else { return event }
 
             let location = view.convert(event.locationInWindow, from: nil)
-            guard view.bounds.contains(location), location.y >= topExclusion else {
-                return event
+            if scrollOwner == nil {
+                guard view.bounds.contains(location), location.y >= topExclusion else {
+                    return event
+                }
+
+                let zoomsCanvas = event.modifierFlags.contains(.command)
+                let beginsOverCard = excludedRects.contains { $0.contains(location) }
+                scrollOwner = zoomsCanvas || !beginsOverCard ? .canvas : .card
             }
-            guard !excludedRects.contains(where: { $0.contains(location) }) else {
+
+            guard let scrollOwner else { return event }
+            scheduleInteractionEnd(for: event)
+
+            guard scrollOwner == .canvas else {
                 return event
             }
 
@@ -86,18 +135,63 @@ struct CanvasScrollMonitor: NSViewRepresentable {
                 width: event.scrollingDeltaX * multiplier,
                 height: event.scrollingDeltaY * multiplier
             )
-            guard abs(translation.width) > 0.01 || abs(translation.height) > 0.01 else {
-                return event
+            let hasMovement = abs(translation.width) > 0.01
+                || abs(translation.height) > 0.01
+
+            if hasMovement || event.phase.contains(.began) {
+                beginCanvasInteractionIfNeeded()
             }
 
-            onScroll?(
-                CanvasScrollEvent(
-                    translation: translation,
-                    location: location,
-                    zoomsCanvas: event.modifierFlags.contains(.command)
+            if hasMovement {
+                onScroll?(
+                    CanvasScrollEvent(
+                        translation: translation,
+                        location: location,
+                        zoomsCanvas: event.modifierFlags.contains(.command)
+                    )
                 )
-            )
+            }
             return nil
+        }
+
+        private func beginCanvasInteractionIfNeeded() {
+            guard !isCanvasInteractionActive else { return }
+            isCanvasInteractionActive = true
+            onInteractionChanged?(true)
+        }
+
+        private func scheduleInteractionEnd(for event: NSEvent) {
+            let isTerminal = event.phase.contains(.ended)
+                || event.phase.contains(.cancelled)
+                || event.momentumPhase.contains(.ended)
+                || event.momentumPhase.contains(.cancelled)
+            let isUnphasedEvent = event.phase.isEmpty && event.momentumPhase.isEmpty
+
+            guard isTerminal || isUnphasedEvent else {
+                interactionEndTask?.cancel()
+                interactionEndTask = nil
+                return
+            }
+
+            interactionEndTask?.cancel()
+            interactionEndTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                try? await Task.sleep(for: interactionSettleDelay)
+                guard !Task.isCancelled else { return }
+                finishInteraction()
+            }
+        }
+
+        private func finishInteraction(notify: Bool = true) {
+            interactionEndTask?.cancel()
+            interactionEndTask = nil
+            scrollOwner = nil
+
+            guard isCanvasInteractionActive else { return }
+            isCanvasInteractionActive = false
+            if notify {
+                onInteractionChanged?(false)
+            }
         }
     }
 }

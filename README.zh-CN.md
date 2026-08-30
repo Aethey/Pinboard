@@ -27,7 +27,7 @@ Pinboard 把屏幕变成一块可以自由摆放的思考空间。临时想法�
 - **网格吸附：** 需要整齐排列时打开网格，需要自由摆放时随时关闭。
 - **自动保存：** 关闭后再次打开，Board、便签和画布视角仍会保留。
 - **不重复保存原文件：** 图片和 PDF 通常继续保留在 Finder 中的原位置，Pinboard 只记住访问权限并生成轻量预览；如果 macOS 无法保留访问权限，才会自动保存一份私有副本。大文件不会进入便签数据库。
-- **AI 对话归档：** 只需让支持 MCP 的 Agent 保存当前对话，它会自动生成 Markdown 摘要、识别 ChatGPT、Claude 或 Gemini，并在已有真实分享链接时一并保存。
+- **AI 对话归档：** 只需让支持 MCP 的 Agent 保存当前对话，它会自动生成 Markdown 摘要、识别 ChatGPT、Claude、Gemini、Cursor 或 Codex，并在已有真实分享链接时一并保存。
 
 ## 常用操作
 
@@ -134,13 +134,13 @@ MCP 工具名是 `create_note`。
 把这段聊天保存到 Pinboard。
 ```
 
-Agent 会调用 `save_chat` 并自行完成整理。生成的 Chat 便签会以 Markdown 显示摘要，左上角使用 ChatGPT、Claude 或 Gemini 的紧凑来源徽标和对应强调色。
+Agent 会调用 `save_chat` 并自行完成整理。生成的 Chat 便签会以 Markdown 显示摘要，左上角使用 ChatGPT、Claude、Gemini、Cursor 或 Codex 的提供商图标。
 
 | 参数 | 必填 | 说明 |
 | --- | --- | --- |
 | `title` | 是 | Agent 根据对话生成的简洁标题 |
 | `summary_markdown` | 是 | 整理后的对话摘要，最多 20,000 个字符 |
-| `provider` | 是 | `chatgpt`、`claude`、`gemini` 或 `other`；由 Agent 推断 |
+| `provider` | 是 | `chatgpt`、`claude`、`gemini`、`cursor`、`codex` 或 `other`；由 Agent 推断 |
 | `share_url` | 否 | 当前上下文中已经存在的真实 HTTP(S) 分享链接 |
 | `x`, `y` | 否 | 便签中心位置；两个参数需要一起提供 |
 

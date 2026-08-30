@@ -20,6 +20,7 @@ struct BoardCardView: View {
     let snapToGrid: Bool
     let gridSize: Double
     let canvasScale: CGFloat
+    let isCanvasNavigating: Bool
     let onActivate: () -> Void
     let onDuplicate: () -> Void
     let onDelete: () -> Void
@@ -59,8 +60,8 @@ struct BoardCardView: View {
                 if mode == .board,
                    !card.isLocked,
                    card.kind == .image
-                       ? isHovering
-                       : (!card.isCollapsed && (isSelected || isHovering)) {
+                       ? showsHoverFeedback
+                       : (!card.isCollapsed && (isSelected || showsHoverFeedback)) {
                     resizeHandle
                 }
             }
@@ -155,7 +156,7 @@ struct BoardCardView: View {
                     Button("Delete", role: .destructive, action: onDelete)
                 }
             }
-            .animation(.snappy(duration: 0.18), value: isHovering)
+            .animation(.snappy(duration: 0.18), value: showsHoverFeedback)
             .animation(.snappy(duration: 0.22), value: card.isCollapsed)
             .animation(.snappy(duration: 0.20), value: hasImageOCRText)
             .task(id: imageOCRFeedback) {
@@ -305,10 +306,7 @@ struct BoardCardView: View {
         } else {
             CardKindIcon(
                 kind: card.kind,
-                size: PinboardTheme.Controls.cardIconSize,
-                backgroundColor: kindIconBackground,
-                foregroundColor: kindIconForeground,
-                borderColor: kindIconForeground.opacity(0.24)
+                size: PinboardTheme.Controls.cardIconSize
             )
             .help(card.isLocked ? "Card locked" : "Drag card")
         }
@@ -398,12 +396,12 @@ struct BoardCardView: View {
         ZStack(alignment: .top) {
             imageCardBody
 
-            if mode == .board, isHovering {
+            if mode == .board, showsHoverFeedback {
                 imageHoverToolbar
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            if mode == .board, isHovering, let imageOCRFeedback {
+            if mode == .board, showsHoverFeedback, let imageOCRFeedback {
                 Text(imageOCRFeedback)
                     .font(.system(size: 10.5, weight: .medium))
                     .foregroundStyle(.primary.opacity(0.82))
@@ -876,7 +874,7 @@ struct BoardCardView: View {
     @ViewBuilder
     private var selectionOutline: some View {
         if card.kind == .image {
-            if mode == .board, isHovering {
+            if mode == .board, showsHoverFeedback {
                 RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
                     .stroke(
                         isSelected ? PinboardTheme.selection : .white.opacity(0.32),
@@ -888,7 +886,7 @@ struct BoardCardView: View {
                 .stroke(
                     mode == .board && isSelected
                         ? PinboardTheme.selection
-                        : .white.opacity(mode == .board && isHovering ? 0.17 : 0.09),
+                        : .white.opacity(mode == .board && showsHoverFeedback ? 0.17 : 0.09),
                     lineWidth: mode == .board && isSelected ? 1.25 : 1
                 )
         }
@@ -915,19 +913,8 @@ struct BoardCardView: View {
         card.kind == .image ? 12 : 14
     }
 
-    private var kindIconBackground: Color {
-        switch card.kind {
-        case .link:
-            linkThemeColor
-        case .chat:
-            card.chatProvider.primaryColor
-        default:
-            card.theme.color
-        }
-    }
-
-    private var kindIconForeground: Color {
-        card.kind == .link || card.kind == .chat ? .white : card.theme.highContrastForeground
+    private var showsHoverFeedback: Bool {
+        isHovering && !isCanvasNavigating
     }
 
     private var linkThemeColor: Color {

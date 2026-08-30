@@ -17,6 +17,7 @@ struct BoardCardsLayer: View {
     let gridSize: Double
     let canvasSize: CGSize
     let canvasViewport: CanvasViewport
+    let isCanvasNavigating: Bool
     let search: BoardSearchController
     let onCardsChanged: ([BoardCard]) -> Void
     let onActivate: (BoardCard) -> Void
@@ -38,6 +39,7 @@ struct BoardCardsLayer: View {
         gridSize: Double,
         canvasSize: CGSize,
         canvasViewport: CanvasViewport,
+        isCanvasNavigating: Bool,
         search: BoardSearchController,
         onCardsChanged: @escaping ([BoardCard]) -> Void,
         onActivate: @escaping (BoardCard) -> Void,
@@ -60,6 +62,7 @@ struct BoardCardsLayer: View {
         self.gridSize = gridSize
         self.canvasSize = canvasSize
         self.canvasViewport = canvasViewport
+        self.isCanvasNavigating = isCanvasNavigating
         self.search = search
         self.onCardsChanged = onCardsChanged
         self.onActivate = onActivate
@@ -118,6 +121,7 @@ struct BoardCardsLayer: View {
             snapToGrid: snapToGrid,
             gridSize: gridSize,
             canvasScale: canvasViewport.scale,
+            isCanvasNavigating: isCanvasNavigating,
             onActivate: { onActivate(card) },
             onDuplicate: { onDuplicate(card) },
             onDelete: { onDelete(card) }
