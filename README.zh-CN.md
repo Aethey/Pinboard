@@ -8,7 +8,7 @@
 
 ## 下载
 
-[**下载 Pinboard 1.0 for macOS（.dmg）**](https://github.com/Aethey/Pinboard/releases/latest/download/Pinboard-1.0.dmg)
+[**下载 Pinboard 1.0 Beta 1 for macOS（.dmg）**](https://github.com/Aethey/Pinboard/releases/download/v1.0.0-beta.1/Pinboard-1.0.0-beta.1.dmg)
 
 打开 DMG，然后把 **Pinboard** 拖入“**应用程序**”文件夹。当前版本用于本地体验，暂未进行 Apple 公证。如果 macOS 首次启动时阻止打开，请在“应用程序”中按住 Control 点击 Pinboard，选择“**打开**”，然后再次确认。
 

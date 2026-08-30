@@ -8,7 +8,7 @@
 
 ## Download
 
-[**Download Pinboard 1.0 for macOS (.dmg)**](https://github.com/Aethey/Pinboard/releases/latest/download/Pinboard-1.0.dmg)
+[**Download Pinboard 1.0 Beta 1 for macOS (.dmg)**](https://github.com/Aethey/Pinboard/releases/download/v1.0.0-beta.1/Pinboard-1.0.0-beta.1.dmg)
 
 Open the DMG, then drag **Pinboard** into **Applications**. This preview build is intended for local testing and is not notarized yet. If macOS blocks the first launch, Control-click Pinboard in Applications, choose **Open**, then confirm **Open** once more.
 
