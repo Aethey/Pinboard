@@ -8,6 +8,7 @@ import SwiftUI
 
 struct BoardCardView: View {
     @Environment(AttachmentLibrary.self) private var attachmentLibrary
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum FocusedField: Hashable {
         case title
@@ -56,6 +57,15 @@ struct BoardCardView: View {
             .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
             .overlay(selectionOutline)
+            .overlay(alignment: .topLeading) {
+                Color.clear
+                    .frame(width: displayedSize.width, height: noteTitleBarHeight)
+                    .contentShape(Rectangle())
+                    .allowsHitTesting(false)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Drag \(card.title)")
+                    .accessibilityIdentifier("card-drag-\(card.id.uuidString)")
+            }
             .overlay(alignment: .bottomTrailing) {
                 if mode == .board,
                    !card.isLocked,
@@ -65,10 +75,15 @@ struct BoardCardView: View {
                     resizeHandle
                 }
             }
+            .scaleEffect(
+                isDraggingCard && !reduceMotion && !PinboardMotion.isDisabled ? 1.012 : 1
+            )
             .shadow(
-                color: .black.opacity(mode == .board ? 0.30 : 0.18),
-                radius: card.kind == .image ? 12 : 16,
-                y: card.kind == .image ? 6 : 8
+                color: .black.opacity(
+                    isDraggingCard ? 0.36 : (mode == .board ? 0.30 : 0.18)
+                ),
+                radius: (card.kind == .image ? 12 : 16) + (isDraggingCard ? 3 : 0),
+                y: (card.kind == .image ? 6 : 8) + (isDraggingCard ? 2 : 0)
             )
             .onHover { isHovering = $0 }
             .position(
@@ -78,7 +93,7 @@ struct BoardCardView: View {
             .simultaneousGesture(selectionGesture)
             .zIndex(Double(card.zIndex))
             .transaction { transaction in
-                if isDraggingCard || isResizingCard {
+                if isResizingCard {
                     transaction.animation = nil
                 }
             }
@@ -156,9 +171,10 @@ struct BoardCardView: View {
                     Button("Delete", role: .destructive, action: onDelete)
                 }
             }
-            .animation(.snappy(duration: 0.18), value: showsHoverFeedback)
-            .animation(.snappy(duration: 0.22), value: card.isCollapsed)
-            .animation(.snappy(duration: 0.20), value: hasImageOCRText)
+            .animation(PinboardMotion.hover(reduceMotion: reduceMotion), value: showsHoverFeedback)
+            .animation(PinboardMotion.cardState(reduceMotion: reduceMotion), value: card.isCollapsed)
+            .animation(PinboardMotion.contentChange(reduceMotion: reduceMotion), value: hasImageOCRText)
+            .animation(PinboardMotion.cardPickup(reduceMotion: reduceMotion), value: isDraggingCard)
             .task(id: imageOCRFeedback) {
                 guard imageOCRFeedback != nil else { return }
                 try? await Task.sleep(for: .seconds(2.4))
@@ -186,6 +202,7 @@ struct BoardCardView: View {
                 if !card.isCollapsed {
                     cardContent
                         .contentShape(Rectangle())
+                        .transition(.opacity)
                 }
             }
         }
@@ -284,6 +301,7 @@ struct BoardCardView: View {
                             help: card.isCollapsed ? "Expand card" : "Collapse card",
                             action: toggleCollapsed
                         )
+                        .accessibilityIdentifier("card-collapse-\(card.id.uuidString)")
                     }
                 }
             }
@@ -295,7 +313,7 @@ struct BoardCardView: View {
         .background(cardHeaderBackground)
         .contentShape(Rectangle())
         .simultaneousGesture(dragGesture)
-        .animation(.snappy(duration: 0.22), value: card.isCollapsed)
+        .animation(PinboardMotion.cardState(reduceMotion: reduceMotion), value: card.isCollapsed)
     }
 
     @ViewBuilder
@@ -317,6 +335,11 @@ struct BoardCardView: View {
             return card.chatProvider.primaryColor.opacity(mode == .board ? 0.075 : 0.10)
         }
         return .white.opacity(mode == .board ? 0.028 : 0.016)
+    }
+
+    private func hoverToolbarTransition(edge: Edge) -> AnyTransition {
+        guard !reduceMotion, !PinboardMotion.isDisabled else { return .opacity }
+        return .move(edge: edge).combined(with: .opacity)
     }
 
     @ViewBuilder
@@ -367,7 +390,10 @@ struct BoardCardView: View {
                         .transition(.opacity)
                 }
             }
-            .animation(.easeOut(duration: 0.24), value: card.linkMetadataStateRawValue)
+            .animation(
+                PinboardMotion.contentChange(reduceMotion: reduceMotion),
+                value: card.linkMetadataStateRawValue
+            )
         }
     }
 
@@ -398,7 +424,7 @@ struct BoardCardView: View {
 
             if mode == .board, showsHoverFeedback {
                 imageHoverToolbar
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(hoverToolbarTransition(edge: .top))
             }
 
             if mode == .board, showsHoverFeedback, let imageOCRFeedback {
@@ -412,7 +438,7 @@ struct BoardCardView: View {
                     .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
                     .frame(maxHeight: .infinity, alignment: .bottom)
                     .padding(8)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(hoverToolbarTransition(edge: .bottom))
             }
         }
         .contentShape(Rectangle())
@@ -1202,7 +1228,7 @@ struct BoardCardView: View {
         isEditingTitle = false
         focusedField = nil
 
-        withAnimation(.snappy(duration: 0.22)) {
+        withAnimation(PinboardMotion.cardState(reduceMotion: reduceMotion)) {
             if card.showsImageOCRSplit {
                 card.showsImageOCRSplit = false
 

@@ -36,6 +36,7 @@ struct CanvasZoomControl: View {
             .buttonStyle(.plain)
             .foregroundStyle(.primary.opacity(0.76))
             .accessibilityLabel("Reset zoom to 100 percent")
+            .accessibilityIdentifier("canvas-zoom-reset")
             .help("Reset zoom (⌘0)")
             .keyboardShortcut("0", modifiers: .command)
 
@@ -75,6 +76,9 @@ struct CanvasZoomControl: View {
         .foregroundStyle(.primary.opacity(isEnabled ? 0.76 : 0.28))
         .disabled(!isEnabled)
         .accessibilityLabel(label)
+        .accessibilityIdentifier(
+            label == "Zoom out" ? "canvas-zoom-out" : "canvas-zoom-in"
+        )
         .help(label)
     }
 

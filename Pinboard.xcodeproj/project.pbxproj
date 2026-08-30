@@ -13,6 +13,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		B10000000000000000000007 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 12AF63C33040415E009C8856 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 12AF63CA3040415E009C8856;
+			remoteInfo = Pinboard;
+		};
 		A10000000000000000000011 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 12AF63C33040415E009C8856 /* Project object */;
@@ -38,6 +45,7 @@
 
 /* Begin PBXFileReference section */
 		12AF63CB3040415E009C8856 /* Pinboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pinboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000001 /* PinboardPerformanceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PinboardPerformanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000001 /* pinboard-mcp */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "pinboard-mcp"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000002 /* PinboardMCP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinboardMCP.swift; sourceTree = "<group>"; };
 		A10000000000000000000013 /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = "<group>"; };
@@ -63,6 +71,11 @@
 			path = Pinboard;
 			sourceTree = "<group>";
 		};
+		B10000000000000000000002 /* PinboardPerformanceTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PinboardPerformanceTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,6 +94,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B10000000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -88,6 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				12AF63CD3040415E009C8856 /* Pinboard */,
+				B10000000000000000000002 /* PinboardPerformanceTests */,
 				A10000000000000000000003 /* MCP */,
 				12AF63CC3040415E009C8856 /* Products */,
 			);
@@ -97,6 +118,7 @@
 			isa = PBXGroup;
 			children = (
 				12AF63CB3040415E009C8856 /* Pinboard.app */,
+				B10000000000000000000001 /* PinboardPerformanceTests.xctest */,
 				A10000000000000000000001 /* pinboard-mcp */,
 			);
 			name = Products;
@@ -174,6 +196,29 @@
 			productReference = A10000000000000000000001 /* pinboard-mcp */;
 			productType = "com.apple.product-type.tool";
 		};
+		B10000000000000000000006 /* PinboardPerformanceTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1000000000000000000000B /* Build configuration list for PBXNativeTarget "PinboardPerformanceTests" */;
+			buildPhases = (
+				B10000000000000000000003 /* Sources */,
+				B10000000000000000000004 /* Frameworks */,
+				B10000000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B10000000000000000000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B10000000000000000000002 /* PinboardPerformanceTests */,
+			);
+			name = PinboardPerformanceTests;
+			packageProductDependencies = (
+			);
+			productName = PinboardPerformanceTests;
+			productReference = B10000000000000000000001 /* PinboardPerformanceTests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -189,6 +234,10 @@
 					};
 					A1000000000000000000000A = {
 						CreatedOnToolsVersion = 26.6;
+					};
+					B10000000000000000000006 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = 12AF63CA3040415E009C8856;
 					};
 				};
 			};
@@ -211,12 +260,20 @@
 			targets = (
 				12AF63CA3040415E009C8856 /* Pinboard */,
 				A1000000000000000000000A /* PinboardMCP */,
+				B10000000000000000000006 /* PinboardPerformanceTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		12AF63C93040415E009C8856 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -241,6 +298,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B10000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -248,6 +312,11 @@
 			isa = PBXTargetDependency;
 			target = A1000000000000000000000A /* PinboardMCP */;
 			targetProxy = A10000000000000000000011 /* PBXContainerItemProxy */;
+		};
+		B10000000000000000000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 12AF63CA3040415E009C8856 /* Pinboard */;
+			targetProxy = B10000000000000000000007 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -470,6 +539,50 @@
 			};
 			name = Release;
 		};
+		B10000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 38N3R8P926;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = rya.PinboardPerformanceTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Pinboard;
+			};
+			name = Debug;
+		};
+		B1000000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 38N3R8P926;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = rya.PinboardPerformanceTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Pinboard;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -496,6 +609,15 @@
 			buildConfigurations = (
 				A1000000000000000000000B /* Debug */,
 				A1000000000000000000000C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B1000000000000000000000B /* Build configuration list for PBXNativeTarget "PinboardPerformanceTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000000000000000000009 /* Debug */,
+				B1000000000000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

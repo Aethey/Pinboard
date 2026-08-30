@@ -178,3 +178,7 @@ The agent is instructed not to ask you for a manual summary or provider selectio
 - If the agent cannot find `create_note`, `create_board`, or `save_chat`, confirm that `pinboard` appears in its MCP list, then restart the agent or begin a new task so it reloads the updated tool list.
 - If Pinboard cannot be opened, confirm that the command points to the helper inside the installed `Pinboard.app`.
 - If you keep more than one copy of Pinboard, point the command to the exact copy you want the agent to use.
+
+## Quality and performance
+
+Pinboard includes repeatable macOS UI performance tests, deterministic sample Boards, and dated benchmark records. See [Performance benchmarks](Benchmarks/README.md) for the tested interactions and results.

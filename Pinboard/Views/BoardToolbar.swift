@@ -160,6 +160,7 @@ struct BoardToolbar: View {
                             Text(board.name)
                         }
                     }
+                    .accessibilityIdentifier("board-\(board.id.uuidString)")
                 }
 
                 Divider()
@@ -185,6 +186,7 @@ struct BoardToolbar: View {
             .menuIndicator(.hidden)
             .foregroundStyle(.primary.opacity(0.72))
             .accessibilityLabel("Switch Board")
+            .accessibilityIdentifier("board-switcher")
             .help("Switch Board")
         }
     }
@@ -299,6 +301,7 @@ struct BoardToolbar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("New \(kind.title) card")
+        .accessibilityIdentifier("toolbar-add-\(kind.rawValue)")
         .help("New \(kind.title) card")
     }
 }

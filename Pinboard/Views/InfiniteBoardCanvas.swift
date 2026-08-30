@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct InfiniteBoardCanvas: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let board: PinboardBoard
     let activeCards: [BoardCard]
     let mode: BoardMode
@@ -242,7 +243,7 @@ struct InfiniteBoardCanvas: View {
 
     private func zoom(by factor: CGFloat) {
         let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
-        withAnimation(.easeOut(duration: 0.18)) {
+        withAnimation(PinboardMotion.canvas(reduceMotion: reduceMotion)) {
             viewport = viewport.zoomed(
                 to: viewport.scale * factor,
                 around: center,
@@ -254,14 +255,14 @@ struct InfiniteBoardCanvas: View {
 
     private func resetZoom() {
         let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
-        withAnimation(.easeOut(duration: 0.18)) {
+        withAnimation(PinboardMotion.canvas(reduceMotion: reduceMotion)) {
             viewport = viewport.zoomed(to: 1, around: center, in: canvasSize)
         }
         commitViewport()
     }
 
     private func focus(on worldPoint: CGPoint) {
-        withAnimation(.easeOut(duration: 0.22)) {
+        withAnimation(PinboardMotion.canvas(reduceMotion: reduceMotion)) {
             viewport = viewport.centered(on: worldPoint, in: canvasSize)
         }
         commitViewport()

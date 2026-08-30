@@ -1,0 +1,20 @@
+{
+  "source": "xcrun xcresulttool get test-results summary",
+  "sourceResultBundle": "/tmp/PinboardPerfZoomFinal-20260831.xcresult",
+  "result": "Passed",
+  "totalTestCount": 1,
+  "passedTests": 1,
+  "failedTests": 0,
+  "skippedTests": 0,
+  "expectedFailures": 0,
+  "performanceTests": 1,
+  "measuredInteraction": "zoom_reset",
+  "iterations": 5,
+  "buildConfiguration": "Release",
+  "fixture": "normal",
+  "platform": "macOS",
+  "architecture": "arm64",
+  "model": "MacBook Air",
+  "osVersion": "26.6.2",
+  "osBuildNumber": "25G83"
+}

@@ -7,6 +7,7 @@ import SwiftData
 import SwiftUI
 
 struct BoardCardsLayer: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query private var cards: [BoardCard]
 
     let boardID: UUID
@@ -94,7 +95,7 @@ struct BoardCardsLayer: View {
                     .background(.ultraThinMaterial, in: Circle())
                     .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
                     .accessibilityLabel("Loading \(boardName)")
-                    .transition(.scale(scale: 0.92).combined(with: .opacity))
+                    .transition(loadingTransition)
                     .allowsHitTesting(false)
             }
         }
@@ -107,7 +108,10 @@ struct BoardCardsLayer: View {
         .onChange(of: cards.map(\.updatedAt), initial: true) {
             search.updateDocuments(from: cards)
         }
-        .animation(.easeOut(duration: 0.16), value: isPreparingBoard)
+        .animation(
+            PinboardMotion.contentChange(reduceMotion: reduceMotion),
+            value: isPreparingBoard
+        )
     }
 
     private func renderedCard(_ card: BoardCard) -> some View {
@@ -127,7 +131,15 @@ struct BoardCardsLayer: View {
             onDelete: { onDelete(card) }
         )
         .opacity(opacity)
-        .animation(.easeOut(duration: 0.16), value: search.resolvedQuery)
+        .animation(
+            PinboardMotion.contentChange(reduceMotion: reduceMotion),
+            value: search.resolvedQuery
+        )
+    }
+
+    private var loadingTransition: AnyTransition {
+        guard !reduceMotion, !PinboardMotion.isDisabled else { return .opacity }
+        return .scale(scale: 0.96).combined(with: .opacity)
     }
 
     private var renderedCards: [BoardCard] {

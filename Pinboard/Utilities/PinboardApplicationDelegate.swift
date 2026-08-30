@@ -12,14 +12,18 @@ final class PinboardApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         guard
             ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1",
+            !PerformanceTestConfiguration.isEnabled,
             let bundleIdentifier = Bundle.main.bundleIdentifier
         else { return }
 
         let currentProcessIdentifier = ProcessInfo.processInfo.processIdentifier
+        let mainExecutableName = Bundle.main.executableURL?.lastPathComponent
         guard let existingApplication = NSRunningApplication
             .runningApplications(withBundleIdentifier: bundleIdentifier)
             .first(where: {
-                !$0.isTerminated && $0.processIdentifier != currentProcessIdentifier
+                !$0.isTerminated
+                    && $0.processIdentifier != currentProcessIdentifier
+                    && $0.executableURL?.lastPathComponent == mainExecutableName
             })
         else { return }
 
@@ -28,6 +32,7 @@ final class PinboardApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !PerformanceTestConfiguration.isEnabled else { return }
         mcpBridge.start()
     }
 }

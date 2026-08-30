@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct BoardSearchToolbar<NormalContent: View>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable private var search: BoardSearchController
     let onSelectResult: (BoardSearchResult) -> Void
     private let normalContent: NormalContent
@@ -31,10 +32,7 @@ struct BoardSearchToolbar<NormalContent: View>: View {
             if shouldShowSuggestionPanel {
                 suggestionPanel
                     .frame(width: searchFieldWidth)
-                    .transition(
-                        .scale(scale: 0.96, anchor: .topLeading)
-                            .combined(with: .opacity)
-                    )
+                    .transition(suggestionTransition)
             }
         }
         .onChange(of: search.isPresented) { _, isPresented in
@@ -50,9 +48,18 @@ struct BoardSearchToolbar<NormalContent: View>: View {
             guard search.isPresented else { return }
             closeSearch()
         }
-        .animation(.snappy(duration: 0.38), value: search.isPresented)
-        .animation(.easeOut(duration: 0.14), value: search.results)
-        .animation(.easeOut(duration: 0.14), value: search.recentQueries)
+        .animation(
+            PinboardMotion.searchMorph(reduceMotion: reduceMotion),
+            value: search.isPresented
+        )
+        .animation(
+            PinboardMotion.contentChange(reduceMotion: reduceMotion),
+            value: search.results
+        )
+        .animation(
+            PinboardMotion.contentChange(reduceMotion: reduceMotion),
+            value: search.recentQueries
+        )
     }
 
     @ViewBuilder
@@ -117,9 +124,7 @@ struct BoardSearchToolbar<NormalContent: View>: View {
 
     private var searchButton: some View {
         Button {
-            withAnimation(.snappy(duration: 0.38)) {
-                search.open()
-            }
+            search.open()
         } label: {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 13, weight: .semibold))
@@ -130,6 +135,7 @@ struct BoardSearchToolbar<NormalContent: View>: View {
         .buttonStyle(.plain)
         .foregroundStyle(.primary.opacity(0.78))
         .accessibilityLabel("Search notes")
+        .accessibilityIdentifier("toolbar-search")
         .help("Search notes (⌘F)")
         .keyboardShortcut("f", modifiers: .command)
     }
@@ -168,6 +174,7 @@ struct BoardSearchToolbar<NormalContent: View>: View {
         .buttonStyle(.plain)
         .foregroundStyle(.primary.opacity(0.70))
         .accessibilityLabel("Close search")
+        .accessibilityIdentifier("toolbar-search-close")
         .help("Close search")
     }
 
@@ -297,6 +304,11 @@ struct BoardSearchToolbar<NormalContent: View>: View {
 
     private let controlSpacing: CGFloat = 10
 
+    private var suggestionTransition: AnyTransition {
+        guard !reduceMotion, !PinboardMotion.isDisabled else { return .opacity }
+        return .scale(scale: 0.98, anchor: .topLeading).combined(with: .opacity)
+    }
+
     private func submitSearch() {
         if let result = search.results.first {
             select(result)
@@ -311,13 +323,12 @@ struct BoardSearchToolbar<NormalContent: View>: View {
     }
 
     private func closeSearch() {
-        withAnimation(.snappy(duration: 0.38)) {
-            search.close()
-        }
+        search.close()
     }
 }
 
 private struct SearchSuggestionRow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let kind: CardKind?
     let systemImage: String?
     let title: String
@@ -396,7 +407,7 @@ private struct SearchSuggestionRow: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
-        .animation(.easeOut(duration: 0.10), value: isHovering)
+        .animation(PinboardMotion.hover(reduceMotion: reduceMotion), value: isHovering)
     }
 }
 

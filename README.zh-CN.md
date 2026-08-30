@@ -178,3 +178,7 @@ MCP 会明确要求 Agent 不向用户索要手写摘要，也不让用户选择
 - Agent 找不到 `create_note`、`create_board` 或 `save_chat`：确认 MCP 列表中已经出现 `pinboard`，然后重启 Agent 或新建一个任务，让它重新加载工具列表。
 - Pinboard 无法打开：确认 command 指向已安装 `Pinboard.app` 内部的辅助程序。
 - 电脑中有多个 Pinboard：把 command 指向你希望 Agent 使用的那个应用副本。
+
+## 测试与性能
+
+项目保留了可重复运行的 macOS UI 性能测试、固定测试数据和带日期的结果记录。测试场景与数据见 [性能基准记录](Benchmarks/README.md)。

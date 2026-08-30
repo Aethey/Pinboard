@@ -1,0 +1,18 @@
+{
+  "source": "xcrun xcresulttool get test-results summary",
+  "sourceResultBundle": "/tmp/PinboardPerfFinal-20260831.xcresult",
+  "result": "Passed",
+  "totalTestCount": 5,
+  "passedTests": 5,
+  "failedTests": 0,
+  "skippedTests": 0,
+  "expectedFailures": 0,
+  "performanceTests": 5,
+  "buildConfiguration": "Release",
+  "fixture": "normal",
+  "platform": "macOS",
+  "architecture": "arm64",
+  "model": "MacBook Air",
+  "osVersion": "26.6.2",
+  "osBuildNumber": "25G83"
+}

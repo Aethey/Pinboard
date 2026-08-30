@@ -186,6 +186,14 @@ struct ContentView: View {
     }
 
     private func preparePersistentBoards() {
+        if let profile = PerformanceTestConfiguration.fixtureProfile {
+            let board = PerformanceFixture.install(profile: profile, in: modelContext)
+            activeBoardIDString = board.id.uuidString
+            activeViewport = CanvasViewport(board: board)
+            saveNow()
+            return
+        }
+
         let board = resolvedInitialBoard()
         let storedCards = fetchAllCards()
 
@@ -229,6 +237,8 @@ struct ContentView: View {
     }
 
     private func selectBoard(_ board: PinboardBoard) {
+        guard board.id != activeBoard?.id else { return }
+
         search.close()
         activeCards = []
         activeViewport = CanvasViewport(board: board)

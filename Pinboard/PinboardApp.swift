@@ -17,20 +17,23 @@ struct PinboardApp: App {
     @State private var attachmentLibrary = AttachmentLibrary()
 
     var body: some Scene {
-        Window("Pinboard", id: "main") {
+        WindowGroup("Pinboard", id: "main") {
             ContentView()
                 .environment(session)
                 .environment(attachmentLibrary)
         }
         .modelContainer(
             for: [BoardCard.self, PinboardBoard.self],
+            inMemory: PerformanceTestConfiguration.isEnabled,
             isAutosaveEnabled: true,
             isUndoEnabled: true
         )
         .defaultSize(width: 1180, height: 780)
         .windowStyle(.hiddenTitleBar)
         .commands {
-            CommandGroup(replacing: .newItem) { }
+            if !PerformanceTestConfiguration.isEnabled {
+                CommandGroup(replacing: .newItem) { }
+            }
 
             CommandMenu("Board") {
                 Button("Switch to \(session.mode == .board ? "Desktop" : "Board") Mode") {
