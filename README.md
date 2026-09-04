@@ -9,12 +9,6 @@
 ![Pinboard preview](Image/image1.png)
 
 
-Open the DMG, then drag **Pinboard** into **Applications**. This preview build is intended for local testing and is not notarized yet. If macOS blocks the first launch, Control-click Pinboard in Applications, choose **Open**, then confirm **Open** once more.
-
-Pinboard turns your screen into a flexible space for thoughts, references, and temporary information. Place notes wherever they make sense, keep related ideas together, and leave important content visible while you work.
-
-There are no folders to organize before you begin. Open a board, put something down, and shape the space as your ideas develop.
-
 ## Highlights
 
 - **Write anywhere:** double-click an empty point to create a note exactly where you need it. Pinboard automatically adjusts placement near window edges.
