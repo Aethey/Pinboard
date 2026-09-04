@@ -900,7 +900,7 @@ struct BoardCardView: View {
     @ViewBuilder
     private var selectionOutline: some View {
         if card.kind == .image {
-            if mode == .board, showsHoverFeedback {
+            if mode == .board, isSelected || showsHoverFeedback {
                 RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
                     .stroke(
                         isSelected ? PinboardTheme.selection : .white.opacity(0.32),

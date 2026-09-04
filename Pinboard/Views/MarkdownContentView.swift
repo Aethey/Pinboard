@@ -3,6 +3,7 @@
 //  Pinboard
 //
 
+import AppKit
 import SwiftUI
 
 struct MarkdownContentView: View {
@@ -84,6 +85,116 @@ struct MarkdownContentView: View {
         default:
             .system(size: baseFontSize * 1.1, weight: .semibold)
         }
+    }
+
+    static func fittingHeight(
+        markdown: String,
+        baseFontSize: CGFloat,
+        textWidth: CGFloat
+    ) -> CGFloat {
+        let blocks = MarkdownBlockParser.parse(markdown)
+        let blockHeights = blocks.map { block -> CGFloat in
+            switch block.kind {
+            case let .line(line):
+                lineFittingHeight(line, baseFontSize: baseFontSize, textWidth: textWidth)
+            case let .table(table):
+                tableFittingHeight(table, baseFontSize: baseFontSize)
+            }
+        }
+        return ceil(blockHeights.reduce(0, +) + CGFloat(max(0, blocks.count - 1)) * 7 + 2)
+    }
+
+    private static func lineFittingHeight(
+        _ line: MarkdownLine,
+        baseFontSize: CGFloat,
+        textWidth: CGFloat
+    ) -> CGFloat {
+        switch line.kind {
+        case .blank:
+            return 3
+
+        case let .heading(level, content):
+            let size: CGFloat
+            let weight: NSFont.Weight
+            switch level {
+            case 1:
+                size = baseFontSize * 1.45
+                weight = .bold
+            case 2:
+                size = baseFontSize * 1.25
+                weight = .semibold
+            default:
+                size = baseFontSize * 1.1
+                weight = .semibold
+            }
+            return measuredHeight(
+                content,
+                font: .systemFont(ofSize: size, weight: weight),
+                width: textWidth
+            ) + (level == 1 ? 2 : 0)
+
+        case let .bullet(content):
+            let font = NSFont.systemFont(ofSize: baseFontSize)
+            let prefixWidth = measuredWidth("•", font: font) + 7
+            return measuredHeight(content, font: font, width: textWidth - prefixWidth)
+
+        case let .numbered(number, content):
+            let font = NSFont.systemFont(ofSize: baseFontSize)
+            let prefixWidth = measuredWidth("\(number).", font: font) + 7
+            return measuredHeight(content, font: font, width: textWidth - prefixWidth)
+
+        case let .paragraph(content):
+            return measuredHeight(
+                content,
+                font: .systemFont(ofSize: baseFontSize, weight: .medium),
+                width: textWidth
+            )
+        }
+    }
+
+    private static func tableFittingHeight(
+        _ table: MarkdownTable,
+        baseFontSize: CGFloat
+    ) -> CGFloat {
+        let columnWidths = table.header.indices.map { column in
+            let values = [table.header[column]] + table.rows.map { $0[column] }
+            let longestValue = values.map(\.count).max() ?? 0
+            let estimatedWidth = CGFloat(longestValue) * baseFontSize * 0.52 + 16
+            return min(280, max(72, estimatedWidth))
+        }
+        let rows = [table.header] + table.rows
+        let rowsHeight = rows.enumerated().reduce(CGFloat.zero) { result, row in
+            let font = NSFont.systemFont(
+                ofSize: max(10, baseFontSize * 0.82),
+                weight: row.offset == 0 ? .semibold : .regular
+            )
+            let height = row.element.enumerated().reduce(CGFloat.zero) { maximum, cell in
+                max(
+                    maximum,
+                    measuredHeight(
+                        cell.element,
+                        font: font,
+                        width: columnWidths[cell.offset] - 16
+                    ) + 12
+                )
+            }
+            return result + height
+        }
+        return rowsHeight + CGFloat(max(0, rows.count - 1))
+    }
+
+    private static func measuredHeight(_ text: String, font: NSFont, width: CGFloat) -> CGFloat {
+        let displayText = text.isEmpty ? " " : text
+        let bounds = (displayText as NSString).boundingRect(
+            with: CGSize(width: max(1, width * 0.96), height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font]
+        )
+        return ceil(max(font.ascender - font.descender + font.leading, bounds.height))
+    }
+
+    private static func measuredWidth(_ text: String, font: NSFont) -> CGFloat {
+        ceil((text as NSString).size(withAttributes: [.font: font]).width)
     }
 }
 

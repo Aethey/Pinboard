@@ -1,5 +1,7 @@
 # Pinboard
 
+[![构建 macOS DMG](https://github.com/Aethey/Pinboard/actions/workflows/build-macos.yml/badge.svg)](https://github.com/Aethey/Pinboard/actions/workflows/build-macos.yml)
+
 [English](README.md) · **简体中文** · [日本語](README.ja.md)
 
 **一款自由、直观的 macOS 空间便签应用。**
@@ -26,6 +28,9 @@ Pinboard 把屏幕变成一块可以自由摆放的思考空间。临时想法�
 - **多个 Board：** 工作、学习、项目和临时资料可以放在不同画板中。通过顶部控件创建或切换 Board，双击名称即可改名。
 - **快速搜索：** 点击搜索按钮或按 `⌘F` 检索当前 Board。输入时会实时联想，不相关的便签会自动淡化，并保留最近 10 条搜索记录。
 - **自由调整便签：** 可以移动、缩放、换色、折叠、复制、锁定或删除；点击任何便签都会把它带到最上层。
+- **多选便签：** 按 `⌘A` 全选，或按住 Command 在空白区域拖动鼠标进行框选。选中的便签会保留蓝色边框，按 `Esc` 或点击画布即可取消。
+- **批量修改字体：** 通过多选工具栏同时修改所选文本、Markdown 和 Chat 便签的字号；图片、PDF 和链接会自动跳过。
+- **自动适配内容高度：** 一键调整所选文字便签的高度，确保正文完整显示；重复执行时会复用测量结果，并避免无意义的保存。
 - **紧凑的操作区：** 常用操作集中在标题栏，不打扰正文。图片的操作按钮只会在鼠标移入当前图片时出现。
 - **图片 OCR：** 识别本地图片中的文字，并以左侧图片、右侧可编辑文本的方式查看。
 - **清晰的 Markdown 预览：** 可以随时切换源码和预览，支持标题、列表、代码、链接以及可滚动表格。
@@ -51,6 +56,9 @@ Pinboard 把屏幕变成一块可以自由摆放的思考空间。临时想法�
 | 移动文本便签 | 按住标题栏任意位置拖动 |
 | 移动图片 | 鼠标移入图片后，拖动左上角把手 |
 | 缩放便签 | 拖动右下角把手 |
+| 选择多张便签 | 按 `⌘A`，或按住 Command 在空白区域拖动；按 `Esc` 取消选择 |
+| 批量修改字号 | 选中便签后，使用多选工具栏中的“字体大小”；不支持的类型会自动跳过 |
+| 让便签适配全部文字 | 选中便签后，点击多选工具栏中的“Fit content” |
 | 编辑标题 | 双击标题文字 |
 | 修改颜色或字体大小 | 点击调色板或字号按钮 |
 | 折叠或展开 | 点击箭头按钮 |
@@ -182,3 +190,17 @@ MCP 会明确要求 Agent 不向用户索要手写摘要，也不让用户选择
 ## 测试与性能
 
 项目保留了可重复运行的 macOS UI 性能测试、固定测试数据和带日期的结果记录。测试场景与数据见 [性能基准记录](Benchmarks/README.md)。
+
+## 持续集成
+
+GitHub Actions 会在代码推送到 `main`、创建版本标签、提交 Pull Request 或手动触发时，自动生成 Release 归档和 macOS DMG。可以在该次 workflow 的 **Artifacts** 区域下载 DMG 以及对应的 SHA-256 校验文件。
+
+推送指向 `main` 提交的 `v*` 标签时，还会自动创建或更新 GitHub Release，并附加 DMG 和校验文件。Annotated tag 的 message 会直接作为 Release 更新说明；lightweight tag 没有独立 message，因此更新说明为空。名称中带连字符的标签（例如 `v1.1.0-beta.1`）会发布为 Pre-release。
+
+```bash
+git tag -a v1.1.0 -m "这里填写本次更新内容"
+git push origin main
+git push origin v1.1.0
+```
+
+CI 产物会进行临时签名以验证包结构，但不会使用 Developer ID 签名，也不会提交 Apple 公证。正式公开发布仍需要配置 Apple 开发者证书与 notarization。

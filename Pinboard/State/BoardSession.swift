@@ -36,7 +36,13 @@ enum BoardMode: String, CaseIterable, Identifiable {
 @Observable
 final class BoardSession {
     var mode: BoardMode = .board
-    var selectedCardID: UUID?
+    var selectedCardIDs: Set<UUID> = []
+    var selectedCardID: UUID? {
+        get { selectedCardIDs.first }
+        set {
+            selectedCardIDs = newValue.map { [$0] } ?? []
+        }
+    }
     var snapToGrid = true
     var gridSize: Double = 16
     var hotKeyIsAvailable = false
@@ -60,4 +66,3 @@ final class BoardSession {
         NSApp.windows.first(where: { $0.canBecomeKey })?.makeKeyAndOrderFront(nil)
     }
 }
-

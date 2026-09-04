@@ -77,6 +77,37 @@ final class PinboardPerformanceTests: XCTestCase {
         }
     }
 
+    func testSelectAllZoomCycle() throws {
+        let zoomOut = element("canvas-zoom-out")
+        let reset = element("canvas-zoom-reset")
+        XCTAssertTrue(zoomOut.waitForExistence(timeout: 8))
+        XCTAssertTrue(reset.exists)
+
+        app.typeKey("a", modifierFlags: .command)
+        XCTAssertTrue(element("selection-fit-content").waitForExistence(timeout: 2))
+
+        measureInteraction {
+            zoomOut.click()
+            zoomOut.click()
+            self.settle(0.35)
+            reset.click()
+            self.settle(0.35)
+        }
+    }
+
+    func testSelectAllFitContentCycle() throws {
+        XCTAssertTrue(element("toolbar-search").waitForExistence(timeout: 8))
+
+        app.typeKey("a", modifierFlags: .command)
+        let fitContent = element("selection-fit-content")
+        XCTAssertTrue(fitContent.waitForExistence(timeout: 2))
+
+        measureInteraction {
+            fitContent.click()
+            self.settle(0.40)
+        }
+    }
+
     func testCardDragCycle() throws {
         let card = element("card-drag-\(primaryCardID)")
         XCTAssertTrue(card.waitForExistence(timeout: 8))

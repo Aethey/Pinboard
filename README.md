@@ -1,5 +1,7 @@
 # Pinboard
 
+[![Build macOS DMG](https://github.com/Aethey/Pinboard/actions/workflows/build-macos.yml/badge.svg)](https://github.com/Aethey/Pinboard/actions/workflows/build-macos.yml)
+
 **English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
 
 **A spatial note board for macOS.**
@@ -26,6 +28,9 @@ There are no folders to organize before you begin. Open a board, put something d
 - **Multiple boards:** separate work, study, projects, and temporary material into independent spaces. Create or switch boards from the top control, and double-click a board name to rename it.
 - **Fast search:** click Search or press `⌘F` to search the current board. Live suggestions appear as you type, unrelated cards fade into the background, and your 10 most recent searches remain close at hand.
 - **Flexible cards:** move, resize, recolor, collapse, duplicate, lock, or delete a card. Clicking a card always brings it to the front.
+- **Multi-selection:** press `⌘A` to select every card, or hold Command while dragging an empty area to draw a selection box. Selected cards keep a blue outline until you press `Esc` or click the canvas.
+- **Batch text formatting:** use the selection toolbar to change the font size of selected text, Markdown, and Chat cards together. Images, PDFs, and links are skipped automatically.
+- **Fit cards to their content:** resize selected text-based cards in one click so their full contents remain visible. Repeated fitting reuses measurements and avoids unnecessary saves.
 - **Focused controls:** card actions stay compact and close to the content. Image controls appear only when you hover over that image.
 - **Image OCR:** recognize text in a local image, then view the image and editable text side by side.
 - **Readable Markdown:** switch between source and preview, with support for headings, lists, code, links, and scrollable tables.
@@ -51,6 +56,9 @@ There are no folders to organize before you begin. Open a board, put something d
 | Move a note | Drag anywhere on its title bar |
 | Move an image | Hover over it, then drag the top-left handle |
 | Resize a card | Drag the handle at the bottom-right |
+| Select multiple cards | Press `⌘A`, or hold Command and drag an empty area; press `Esc` to clear the selection |
+| Change selected cards' font size | Select cards, then use Font size in the selection toolbar; unsupported card types are skipped |
+| Fit selected cards to their text | Select cards, then click Fit content in the selection toolbar |
 | Edit a title | Double-click the title text |
 | Change color or font size | Use the palette or font-size button |
 | Collapse or expand | Use the chevron button |
@@ -182,3 +190,17 @@ The agent is instructed not to ask you for a manual summary or provider selectio
 ## Quality and performance
 
 Pinboard includes repeatable macOS UI performance tests, deterministic sample Boards, and dated benchmark records. See [Performance benchmarks](Benchmarks/README.md) for the tested interactions and results.
+
+## Continuous integration
+
+GitHub Actions builds a Release archive and packages it as a macOS DMG on pushes to `main`, version tags, pull requests, and manual runs. Download the DMG and its SHA-256 checksum from the workflow run's **Artifacts** section.
+
+Pushing a `v*` tag whose commit belongs to `main` also creates or updates a GitHub Release and attaches both files. An annotated tag's message becomes the Release update notes; a lightweight tag produces an empty update description. Tags containing a hyphen, such as `v1.1.0-beta.1`, are published as prereleases.
+
+```bash
+git tag -a v1.1.0 -m "Describe the changes in this release"
+git push origin main
+git push origin v1.1.0
+```
+
+CI packages are ad-hoc signed for build verification, but they are not Developer ID signed or notarized. A public release still needs Apple signing credentials and notarization.

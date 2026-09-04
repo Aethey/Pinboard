@@ -34,6 +34,15 @@ enum CardKind: String, CaseIterable, Identifiable {
         }
     }
 
+    var supportsFontSize: Bool {
+        switch self {
+        case .text, .markdown, .chat:
+            true
+        case .image, .pdf, .link:
+            false
+        }
+    }
+
 }
 
 enum ChatProvider: String, CaseIterable, Identifiable {

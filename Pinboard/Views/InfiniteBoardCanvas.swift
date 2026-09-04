@@ -3,6 +3,8 @@
 //  Pinboard
 //
 
+import AppKit
+import Observation
 import SwiftUI
 
 struct InfiniteBoardCanvas: View {
@@ -10,7 +12,7 @@ struct InfiniteBoardCanvas: View {
     let board: PinboardBoard
     let activeCards: [BoardCard]
     let mode: BoardMode
-    let selectedCardID: UUID?
+    let selectedCardIDs: Set<UUID>
     let snapToGrid: Bool
     let gridSize: Double
     let backgroundStyle: BoardBackgroundStyle
@@ -19,6 +21,7 @@ struct InfiniteBoardCanvas: View {
     let focusRequest: BoardFocusRequest?
     let zoomResetRequest: BoardZoomResetRequest?
     let onClearSelection: () -> Void
+    let onSelectCards: (Set<UUID>) -> Void
     let onViewportCommitted: (UUID, CanvasViewport) -> Void
     let onCreateTextAtScreenPoint: (CGPoint, CanvasViewport) -> Void
     let onCardsChanged: ([BoardCard]) -> Void
@@ -33,12 +36,13 @@ struct InfiniteBoardCanvas: View {
     @State private var isDirectlyNavigating = false
     @State private var persistenceTask: Task<Void, Never>?
     @State private var interactionEndTask: Task<Void, Never>?
+    @State private var marqueeState = CanvasMarqueeState()
 
     init(
         board: PinboardBoard,
         activeCards: [BoardCard],
         mode: BoardMode,
-        selectedCardID: UUID?,
+        selectedCardIDs: Set<UUID>,
         snapToGrid: Bool,
         gridSize: Double,
         backgroundStyle: BoardBackgroundStyle,
@@ -47,6 +51,7 @@ struct InfiniteBoardCanvas: View {
         focusRequest: BoardFocusRequest?,
         zoomResetRequest: BoardZoomResetRequest?,
         onClearSelection: @escaping () -> Void,
+        onSelectCards: @escaping (Set<UUID>) -> Void,
         onViewportCommitted: @escaping (UUID, CanvasViewport) -> Void,
         onCreateTextAtScreenPoint: @escaping (CGPoint, CanvasViewport) -> Void,
         onCardsChanged: @escaping ([BoardCard]) -> Void,
@@ -57,7 +62,7 @@ struct InfiniteBoardCanvas: View {
         self.board = board
         self.activeCards = activeCards
         self.mode = mode
-        self.selectedCardID = selectedCardID
+        self.selectedCardIDs = selectedCardIDs
         self.snapToGrid = snapToGrid
         self.gridSize = gridSize
         self.backgroundStyle = backgroundStyle
@@ -66,6 +71,7 @@ struct InfiniteBoardCanvas: View {
         self.focusRequest = focusRequest
         self.zoomResetRequest = zoomResetRequest
         self.onClearSelection = onClearSelection
+        self.onSelectCards = onSelectCards
         self.onViewportCommitted = onViewportCommitted
         self.onCreateTextAtScreenPoint = onCreateTextAtScreenPoint
         self.onCardsChanged = onCardsChanged
@@ -106,7 +112,7 @@ struct InfiniteBoardCanvas: View {
                 boardID: board.id,
                 boardName: board.name,
                 mode: mode,
-                selectedCardID: selectedCardID,
+                selectedCardIDs: selectedCardIDs,
                 snapToGrid: snapToGrid,
                 gridSize: gridSize,
                 canvasSize: canvasSize,
@@ -122,6 +128,9 @@ struct InfiniteBoardCanvas: View {
                     onCreateTextAtScreenPoint(center, viewport)
                 }
             )
+
+            CanvasMarqueeOverlay(state: marqueeState)
+                .zIndex(8_999_999)
 
             if mode == .board {
                 VStack {
@@ -177,6 +186,14 @@ struct InfiniteBoardCanvas: View {
         DragGesture(minimumDistance: 3, coordinateSpace: .local)
             .onChanged { value in
                 guard mode == .board else { return }
+                if panStartViewport == nil, !marqueeState.isSelecting,
+                   NSEvent.modifierFlags.contains(.command) {
+                    marqueeState.isSelecting = true
+                }
+                if marqueeState.isSelecting {
+                    marqueeState.rect = selectionRect(from: value.startLocation, to: value.location)
+                    return
+                }
                 if panStartViewport == nil {
                     panStartViewport = viewport
                     beginDirectNavigation()
@@ -184,12 +201,43 @@ struct InfiniteBoardCanvas: View {
                 guard let panStartViewport else { return }
                 viewport = panStartViewport.translated(by: value.translation)
             }
-            .onEnded { _ in
+            .onEnded { value in
                 guard mode == .board else { return }
+                if marqueeState.isSelecting {
+                    let rect = selectionRect(from: value.startLocation, to: value.location)
+                    onSelectCards(cardIDs(intersecting: rect))
+                    marqueeState.reset()
+                    return
+                }
                 panStartViewport = nil
                 endDirectNavigation()
                 commitViewport()
             }
+    }
+
+    private func selectionRect(from start: CGPoint, to end: CGPoint) -> CGRect {
+        CGRect(
+            x: min(start.x, end.x),
+            y: min(start.y, end.y),
+            width: abs(end.x - start.x),
+            height: abs(end.y - start.y)
+        )
+    }
+
+    private func cardIDs(intersecting selectionRect: CGRect) -> Set<UUID> {
+        Set(activeCards.compactMap { card in
+            let height = card.isCollapsed && card.kind != .image
+                ? PinboardTheme.Controls.cardHeaderHeight
+                : CGFloat(card.height)
+            let worldRect = CGRect(
+                x: CGFloat(card.positionX) - CGFloat(card.width) / 2,
+                y: CGFloat(card.positionY) - height / 2,
+                width: CGFloat(card.width),
+                height: height
+            )
+            let screenRect = effectiveViewport.screenRect(for: worldRect, in: canvasSize)
+            return screenRect.intersects(selectionRect) ? card.id : nil
+        })
     }
 
     private var magnifyGesture: some Gesture {
@@ -303,6 +351,34 @@ struct InfiniteBoardCanvas: View {
                 .screenRect(for: worldRect, in: canvasSize)
                 .insetBy(dx: -4, dy: -4)
             return screenRect.intersects(viewportBounds) ? screenRect : nil
+        }
+    }
+}
+
+@MainActor
+@Observable
+private final class CanvasMarqueeState {
+    var rect: CGRect?
+    var isSelecting = false
+
+    func reset() {
+        rect = nil
+        isSelecting = false
+    }
+}
+
+private struct CanvasMarqueeOverlay: View {
+    let state: CanvasMarqueeState
+
+    @ViewBuilder
+    var body: some View {
+        if let rect = state.rect {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(PinboardTheme.selection.opacity(0.12))
+                .stroke(PinboardTheme.selection.opacity(0.95), lineWidth: 1)
+                .frame(width: rect.width, height: rect.height)
+                .position(x: rect.midX, y: rect.midY)
+                .allowsHitTesting(false)
         }
     }
 }

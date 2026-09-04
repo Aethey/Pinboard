@@ -10,6 +10,22 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
+private struct CardContentMeasurementKey: Hashable {
+    let cardID: UUID
+    let kind: CardKind
+    let content: String
+    let width: Double
+    let fontSize: CardFontSize
+
+    init(card: BoardCard) {
+        cardID = card.id
+        kind = card.kind
+        content = card.content
+        width = card.width
+        fontSize = card.fontSize
+    }
+}
+
 struct ContentView: View {
     private enum AttachmentImportKind {
         case image
@@ -39,6 +55,7 @@ struct ContentView: View {
     @State private var activeViewport = CanvasViewport.defaultValue
     @State private var focusRequest: BoardFocusRequest?
     @State private var zoomResetRequest: BoardZoomResetRequest?
+    @State private var contentHeightCache: [CardContentMeasurementKey: CGFloat] = [:]
     @FocusState private var isBoardFocused: Bool
 
     private var activeBoardID: UUID? {
@@ -58,7 +75,7 @@ struct ContentView: View {
                         board: activeBoard,
                         activeCards: activeCards,
                         mode: session.mode,
-                        selectedCardID: session.selectedCardID,
+                        selectedCardIDs: session.selectedCardIDs,
                         snapToGrid: session.snapToGrid,
                         gridSize: session.gridSize,
                         backgroundStyle: boardBackgroundStyle,
@@ -67,9 +84,10 @@ struct ContentView: View {
                         focusRequest: focusRequest,
                         zoomResetRequest: zoomResetRequest,
                         onClearSelection: {
-                            session.selectedCardID = nil
+                            session.selectedCardIDs.removeAll()
                             isBoardFocused = true
                         },
+                        onSelectCards: selectCards,
                         onViewportCommitted: commitViewport,
                         onCreateTextAtScreenPoint: { point, viewport in
                             addCard(
@@ -89,31 +107,46 @@ struct ContentView: View {
 
                 if session.mode == .board {
                     VStack {
-                        BoardSearchToolbar(
-                            search: search,
-                            onSelectResult: openSearchResult
-                        ) {
-                            BoardToolbar(
-                                mode: session.mode,
-                                snapToGrid: session.snapToGrid,
-                                activeBoard: activeBoard,
-                                boards: boards,
-                                onCreateBoard: createBoard,
-                                onSelectBoard: selectBoard,
-                                onRenameBoard: renameActiveBoard,
-                                onAddText: { addCard(kind: .text, canvasSize: geometry.size) },
-                                onAddMarkdown: { addCard(kind: .markdown, canvasSize: geometry.size) },
-                                onImportImage: {
-                                    presentFileImporter(for: .image, canvasSize: geometry.size)
-                                },
-                                onImportPDF: {
-                                    presentFileImporter(for: .pdf, canvasSize: geometry.size)
-                                },
-                                onAddLink: { addLink($0, canvasSize: geometry.size) },
-                                onToggleGrid: { session.snapToGrid.toggle() },
-                                onResetZoom: resetActiveBoardZoom,
-                                onToggleMode: session.toggleMode
-                            )
+                        VStack(alignment: .boardCreationControls, spacing: 7) {
+                            BoardSearchToolbar(
+                                search: search,
+                                onSelectResult: openSearchResult
+                            ) {
+                                BoardToolbar(
+                                    mode: session.mode,
+                                    snapToGrid: session.snapToGrid,
+                                    activeBoard: activeBoard,
+                                    boards: boards,
+                                    onCreateBoard: createBoard,
+                                    onSelectBoard: selectBoard,
+                                    onRenameBoard: renameActiveBoard,
+                                    onAddText: { addCard(kind: .text, canvasSize: geometry.size) },
+                                    onAddMarkdown: {
+                                        addCard(kind: .markdown, canvasSize: geometry.size)
+                                    },
+                                    onImportImage: {
+                                        presentFileImporter(for: .image, canvasSize: geometry.size)
+                                    },
+                                    onImportPDF: {
+                                        presentFileImporter(for: .pdf, canvasSize: geometry.size)
+                                    },
+                                    onAddLink: { addLink($0, canvasSize: geometry.size) },
+                                    onToggleGrid: { session.snapToGrid.toggle() },
+                                    onResetZoom: resetActiveBoardZoom,
+                                    onArrangeCards: { arrangeCards(in: geometry.size) },
+                                    onToggleMode: session.toggleMode
+                                )
+                            }
+
+                            if !search.isPresented, !selectedCards.isEmpty {
+                                BoardSelectionToolbar(
+                                    selectionCount: selectedCards.count,
+                                    editableSelectionCount: fontEditableSelectedCards.count,
+                                    selectedFontSize: selectedFontSize,
+                                    onSetFontSize: setFontSizeForSelection,
+                                    onFitSelectionToContent: fitSelectionToContent
+                                )
+                            }
                         }
 
                         Spacer()
@@ -126,6 +159,14 @@ struct ContentView: View {
             .focusable()
             .focusEffectDisabled()
             .focused($isBoardFocused)
+            .onKeyPress(.init("a"), phases: .down) { keyPress in
+                guard
+                    session.mode == .board,
+                    keyPress.modifiers.contains(.command)
+                else { return .ignored }
+                session.selectedCardIDs = Set(activeCards.map(\.id))
+                return .handled
+            }
             .onKeyPress(.init("v"), phases: .down) { keyPress in
                 guard
                     session.mode == .board,
@@ -134,6 +175,10 @@ struct ContentView: View {
                 return pasteFromGeneralPasteboard(canvasSize: geometry.size)
                     ? .handled
                     : .ignored
+            }
+            .onExitCommand {
+                guard !session.selectedCardIDs.isEmpty else { return }
+                session.selectedCardIDs.removeAll()
             }
             .dropDestination(for: URL.self, isEnabled: session.mode == .board) { urls, session in
                 importDroppedURLs(
@@ -186,6 +231,21 @@ struct ContentView: View {
     private var selectedCard: BoardCard? {
         guard let selectedCardID = session.selectedCardID else { return nil }
         return activeCards.first { $0.id == selectedCardID }
+    }
+
+    private var selectedCards: [BoardCard] {
+        activeCards.filter { session.selectedCardIDs.contains($0.id) }
+    }
+
+    private var fontEditableSelectedCards: [BoardCard] {
+        selectedCards.filter { !$0.isLocked && $0.kind.supportsFontSize }
+    }
+
+    private var selectedFontSize: CardFontSize? {
+        guard let first = fontEditableSelectedCards.first?.fontSize else { return nil }
+        return fontEditableSelectedCards.dropFirst().allSatisfy { $0.fontSize == first }
+            ? first
+            : nil
     }
 
     private var boardBackgroundStyle: BoardBackgroundStyle {
@@ -789,6 +849,110 @@ struct ContentView: View {
         card.updatedAt = .now
     }
 
+    private func selectCards(_ cardIDs: Set<UUID>) {
+        let activeCardIDs = Set(activeCards.map(\.id))
+        session.selectedCardIDs = cardIDs.intersection(activeCardIDs)
+        isBoardFocused = true
+    }
+
+    private func setFontSizeForSelection(_ fontSize: CardFontSize) {
+        let changedAt = Date.now
+        for card in fontEditableSelectedCards {
+            card.fontSize = fontSize
+            card.updatedAt = changedAt
+        }
+        saveNow()
+    }
+
+    private func fitSelectionToContent() {
+        let cards = fontEditableSelectedCards
+        var updatedCache = contentHeightCache
+        var updates: [(card: BoardCard, currentHeight: CGFloat, fittedHeight: CGFloat)] = []
+        updates.reserveCapacity(cards.count)
+
+        for card in cards {
+            let key = CardContentMeasurementKey(card: card)
+            let contentHeight: CGFloat
+            if let cachedHeight = updatedCache[key] {
+                contentHeight = cachedHeight
+            } else {
+                guard let measuredHeight = measuredContentHeight(for: card) else { continue }
+                updatedCache[key] = measuredHeight
+                contentHeight = measuredHeight
+            }
+
+            let currentHeight = card.isCollapsed
+                ? PinboardTheme.Controls.cardHeaderHeight
+                : CGFloat(card.height)
+            let proposedHeight = PinboardTheme.Controls.cardHeaderHeight + contentHeight + 8
+            let fittedHeight = snappedUp(max(120, proposedHeight))
+            guard card.isCollapsed || abs(CGFloat(card.height) - fittedHeight) > 0.5 else {
+                continue
+            }
+            updates.append((card, currentHeight, fittedHeight))
+        }
+
+        let activeCardIDs = Set(activeCards.map(\.id))
+        contentHeightCache = updatedCache.filter {
+            activeCardIDs.contains($0.key.cardID)
+        }
+
+        guard !updates.isEmpty else { return }
+        let changedAt = Date.now
+        var transaction = Transaction()
+        transaction.animation = nil
+        withTransaction(transaction) {
+            for update in updates {
+                update.card.positionY += Double((update.fittedHeight - update.currentHeight) / 2)
+                update.card.height = Double(update.fittedHeight)
+                update.card.isCollapsed = false
+                update.card.updatedAt = changedAt
+            }
+        }
+        saveNow()
+    }
+
+    private func measuredContentHeight(for card: BoardCard) -> CGFloat? {
+        let contentWidth = max(1, CGFloat(card.width) - 20)
+
+        switch card.kind {
+        case .text:
+            let displayText = card.content.isEmpty ? " " : card.content + "\u{200B}"
+            return measuredTextHeight(
+                displayText,
+                font: .systemFont(ofSize: card.fontSize.pointSize),
+                width: contentWidth
+            )
+            + 18
+
+        case .markdown, .chat:
+            return MarkdownContentView.fittingHeight(
+                markdown: card.content,
+                baseFontSize: card.fontSize.pointSize,
+                textWidth: contentWidth
+            )
+            + 22
+
+        case .image, .pdf, .link:
+            return nil
+        }
+    }
+
+    private func measuredTextHeight(_ text: String, font: NSFont, width: CGFloat) -> CGFloat {
+        let bounds = (text as NSString).boundingRect(
+            with: CGSize(width: max(1, width * 0.98), height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font]
+        )
+        return ceil(max(font.ascender - font.descender + font.leading, bounds.height))
+    }
+
+    private func snappedUp(_ value: CGFloat) -> CGFloat {
+        guard session.snapToGrid, session.gridSize > 0 else { return ceil(value) }
+        let gridSize = CGFloat(session.gridSize)
+        return ceil(value / gridSize) * gridSize
+    }
+
     private func duplicate(_ card: BoardCard) {
         let copy = BoardCard(
             kind: card.kind,
@@ -855,6 +1019,69 @@ struct ContentView: View {
             y: canvasSize.height * 0.5 - 36 + cascade
         )
         return viewport.worldPoint(for: screenPoint, in: canvasSize)
+    }
+
+    private func arrangeCards(in canvasSize: CGSize) {
+        guard !activeCards.isEmpty else { return }
+
+        let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+        let layoutViewport = activeViewport.zoomed(
+            to: 1,
+            around: center,
+            in: canvasSize
+        )
+        let horizontalInset: CGFloat = 32
+        let topInset: CGFloat = 96
+        let gap: CGFloat = 32
+        let rightEdge = max(horizontalInset, canvasSize.width - horizontalInset)
+        var cursorX = horizontalInset
+        var cursorY = topInset
+        var rowHeight: CGFloat = 0
+        let arrangedAt = Date.now
+
+        let cards = activeCards.sorted { lhs, rhs in
+            if abs(lhs.positionY - rhs.positionY) > 1 {
+                return lhs.positionY < rhs.positionY
+            }
+            if abs(lhs.positionX - rhs.positionX) > 1 {
+                return lhs.positionX < rhs.positionX
+            }
+            return lhs.zIndex < rhs.zIndex
+        }
+
+        for card in cards {
+            let size = displayedSize(of: card)
+            if cursorX > horizontalInset, cursorX + size.width > rightEdge {
+                cursorX = horizontalInset
+                cursorY += rowHeight + gap
+                rowHeight = 0
+            }
+
+            let screenCenter = CGPoint(
+                x: cursorX + size.width / 2,
+                y: cursorY + size.height / 2
+            )
+            let worldCenter = layoutViewport.worldPoint(
+                for: screenCenter,
+                in: canvasSize
+            )
+            card.positionX = worldCenter.x
+            card.positionY = worldCenter.y
+            card.updatedAt = arrangedAt
+
+            cursorX += size.width + gap
+            rowHeight = max(rowHeight, size.height)
+        }
+
+        saveNow()
+        resetActiveBoardZoom()
+    }
+
+    private func displayedSize(of card: BoardCard) -> CGSize {
+        let height = card.isCollapsed && card.kind != .image
+            ? PinboardTheme.Controls.cardHeaderHeight
+            : CGFloat(card.height)
+        return CGSize(width: CGFloat(card.width), height: height)
     }
 
     private func generatedBoardLayout(
@@ -998,6 +1225,7 @@ struct ContentView: View {
 
     private func updateActiveCards(_ cards: [BoardCard]) {
         activeCards = cards
+        session.selectedCardIDs.formIntersection(cards.map(\.id))
     }
 
     private func commitViewport(boardID: UUID, viewport: CanvasViewport) {

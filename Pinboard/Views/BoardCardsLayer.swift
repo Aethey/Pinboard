@@ -13,7 +13,7 @@ struct BoardCardsLayer: View {
     let boardID: UUID
     let boardName: String
     let mode: BoardMode
-    let selectedCardID: UUID?
+    let selectedCardIDs: Set<UUID>
     let snapToGrid: Bool
     let gridSize: Double
     let canvasSize: CGSize
@@ -35,7 +35,7 @@ struct BoardCardsLayer: View {
         boardID: UUID,
         boardName: String,
         mode: BoardMode,
-        selectedCardID: UUID?,
+        selectedCardIDs: Set<UUID>,
         snapToGrid: Bool,
         gridSize: Double,
         canvasSize: CGSize,
@@ -58,7 +58,7 @@ struct BoardCardsLayer: View {
         self.boardID = boardID
         self.boardName = boardName
         self.mode = mode
-        self.selectedCardID = selectedCardID
+        self.selectedCardIDs = selectedCardIDs
         self.snapToGrid = snapToGrid
         self.gridSize = gridSize
         self.canvasSize = canvasSize
@@ -115,7 +115,7 @@ struct BoardCardsLayer: View {
     }
 
     private func renderedCard(_ card: BoardCard) -> some View {
-        let isSelected = selectedCardID == card.id
+        let isSelected = selectedCardIDs.contains(card.id)
         let opacity = search.opacity(for: card.id)
 
         return BoardCardView(
