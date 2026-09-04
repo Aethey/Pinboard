@@ -8,7 +8,7 @@ Pinboard keeps its performance checks in the repository so UI and motion changes
 - `Pinboard/Utilities/PerformanceTestConfiguration.swift` creates deterministic, in-memory boards. It never reads or changes the user's real Pinboard data.
 - `results/` contains dated benchmark records with the machine, build configuration, result status, and measured values.
 
-The suite covers Board switching, card collapse/expand, search open/close, canvas zoom/reset, and card dragging. Each measured interaction runs five times and records CPU time, animation hitch ratio, and peak physical memory through XCTest.
+The suite covers Board switching, card collapse/expand, search open/close, canvas zoom/reset, card dragging, selected-card zooming, and fitting selected text cards to their content. Each measured interaction runs five times and records CPU time, animation hitch ratio, and peak physical memory through XCTest.
 
 ## Fixture sizes
 
@@ -64,6 +64,7 @@ This switch is available only as a launch environment for testing; it does not a
 
 ## Recorded runs
 
+- [Selection and Fit Content comparison](results/2026-09-04-selection-performance-comparison.md) — before/after measurements for the multi-selection performance work, including the improved Fit Content path and the unresolved selected-card zoom hitch regression.
 - [Original motion baseline](results/2026-08-31-motion-baseline.md) — the valid before-change measurements and an honest record of two initial test-harness failures.
 - [Final comparison](results/2026-08-31-motion-comparison.md) — the accepted animation implementation, before/after figures, and final pass status.
 - [Rejected Board crossfade](results/2026-08-31-rejected-board-crossfade.md) — an animation experiment removed after it increased CPU, hitching, and memory.

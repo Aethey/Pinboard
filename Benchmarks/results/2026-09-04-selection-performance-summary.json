@@ -1,0 +1,72 @@
+{
+  "date": "2026-09-04",
+  "environment": {
+    "device": "MacBook Air",
+    "architecture": "arm64",
+    "macOS": "26.6.2",
+    "osBuild": "25G83",
+    "xcode": "26.6",
+    "fixture": "normal",
+    "iterationsPerInteraction": 5
+  },
+  "runs": {
+    "before": {
+      "bundle": "/tmp/PinboardBenchmarkBeforeRepeat-20260904.xcresult",
+      "result": "Passed",
+      "passedTests": 2,
+      "failedTests": 0
+    },
+    "after": {
+      "bundle": "/tmp/PinboardBenchmarkAfterFinal-20260904.xcresult",
+      "result": "Passed",
+      "passedTests": 2,
+      "failedTests": 0
+    }
+  },
+  "means": {
+    "selectAllFitContent": {
+      "before": {
+        "cpuTimeSeconds": 0.197595,
+        "hitchRatioMillisecondsPerSecond": 20.000,
+        "peakMemoryKilobytes": 149498.406
+      },
+      "after": {
+        "cpuTimeSeconds": 0.058540,
+        "hitchRatioMillisecondsPerSecond": 0.000,
+        "peakMemoryKilobytes": 146146.240
+      },
+      "percentChange": {
+        "cpuTime": -70.4,
+        "hitchRatio": -100.0,
+        "peakMemory": -2.2
+      }
+    },
+    "selectAllZoomReset": {
+      "before": {
+        "cpuTimeSeconds": 0.714607,
+        "hitchRatioMillisecondsPerSecond": 38.925,
+        "peakMemoryKilobytes": 179857.958
+      },
+      "after": {
+        "cpuTimeSeconds": 0.748361,
+        "hitchRatioMillisecondsPerSecond": 85.706,
+        "peakMemoryKilobytes": 180506.789
+      },
+      "percentChange": {
+        "cpuTime": 4.7,
+        "hitchRatio": 120.2,
+        "peakMemory": 0.4
+      }
+    }
+  },
+  "excludedRuns": [
+    {
+      "bundle": "/tmp/PinboardBenchmarkBeforeRetry-20260904.xcresult",
+      "reason": "No tests were executed."
+    },
+    {
+      "bundle": "/tmp/PinboardBenchmarkAfter-20260904.xcresult",
+      "reason": "Intermediate run; superseded by the accepted final run."
+    }
+  ]
+}
