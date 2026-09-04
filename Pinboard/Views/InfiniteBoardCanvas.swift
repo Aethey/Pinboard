@@ -13,6 +13,7 @@ struct InfiniteBoardCanvas: View {
     let selectedCardID: UUID?
     let snapToGrid: Bool
     let gridSize: Double
+    let backgroundStyle: BoardBackgroundStyle
     let canvasSize: CGSize
     let search: BoardSearchController
     let focusRequest: BoardFocusRequest?
@@ -40,6 +41,7 @@ struct InfiniteBoardCanvas: View {
         selectedCardID: UUID?,
         snapToGrid: Bool,
         gridSize: Double,
+        backgroundStyle: BoardBackgroundStyle,
         canvasSize: CGSize,
         search: BoardSearchController,
         focusRequest: BoardFocusRequest?,
@@ -58,6 +60,7 @@ struct InfiniteBoardCanvas: View {
         self.selectedCardID = selectedCardID
         self.snapToGrid = snapToGrid
         self.gridSize = gridSize
+        self.backgroundStyle = backgroundStyle
         self.canvasSize = canvasSize
         self.search = search
         self.focusRequest = focusRequest
@@ -78,6 +81,7 @@ struct InfiniteBoardCanvas: View {
                 mode: mode,
                 showsGrid: snapToGrid,
                 gridSize: gridSize,
+                backgroundStyle: backgroundStyle,
                 viewport: effectiveViewport
             )
             .contentShape(Rectangle())

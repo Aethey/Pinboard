@@ -2,3 +2,4 @@
 .agents/
 MCP/.build/
 install/*.dmg
+.raivia.local.json

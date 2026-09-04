@@ -5,6 +5,61 @@
 
 import SwiftUI
 
+enum BoardBackgroundStyle: String, CaseIterable, Identifiable {
+    case midnight
+    case graphite
+    case indigo
+    case forest
+    case umber
+
+    static let storageKey = "boardBackgroundStyle"
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .midnight: "Midnight"
+        case .graphite: "Graphite"
+        case .indigo: "Indigo"
+        case .forest: "Forest"
+        case .umber: "Umber"
+        }
+    }
+
+    var topColor: Color {
+        switch self {
+        case .midnight: Color(red: 0.075, green: 0.082, blue: 0.11)
+        case .graphite: Color(red: 0.12, green: 0.125, blue: 0.14)
+        case .indigo: Color(red: 0.105, green: 0.10, blue: 0.19)
+        case .forest: Color(red: 0.07, green: 0.135, blue: 0.12)
+        case .umber: Color(red: 0.16, green: 0.105, blue: 0.075)
+        }
+    }
+
+    var bottomColor: Color {
+        switch self {
+        case .midnight: Color(red: 0.035, green: 0.039, blue: 0.055)
+        case .graphite: Color(red: 0.055, green: 0.058, blue: 0.07)
+        case .indigo: Color(red: 0.045, green: 0.04, blue: 0.09)
+        case .forest: Color(red: 0.025, green: 0.07, blue: 0.06)
+        case .umber: Color(red: 0.075, green: 0.045, blue: 0.035)
+        }
+    }
+
+    var glowColor: Color {
+        switch self {
+        case .midnight, .indigo: .indigo
+        case .graphite: .white
+        case .forest: .teal
+        case .umber: .orange
+        }
+    }
+
+    var gridColor: Color {
+        .white.opacity(0.055)
+    }
+}
+
 extension CardTheme {
     var color: Color {
         switch self {
@@ -82,8 +137,8 @@ extension CardKind {
 }
 
 enum PinboardTheme {
-    static let canvasTop = Color(red: 0.075, green: 0.082, blue: 0.11)
-    static let canvasBottom = Color(red: 0.035, green: 0.039, blue: 0.055)
+    static let canvasTop = BoardBackgroundStyle.midnight.topColor
+    static let canvasBottom = BoardBackgroundStyle.midnight.bottomColor
     static let selection = Color(red: 0.54, green: 0.58, blue: 1.0)
 
     enum Controls {

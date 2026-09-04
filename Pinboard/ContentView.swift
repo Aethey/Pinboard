@@ -32,6 +32,8 @@ struct ContentView: View {
 
     @AppStorage("didCreateWelcomeCards") private var didCreateWelcomeCards = false
     @AppStorage("activeBoardID") private var activeBoardIDString = ""
+    @AppStorage(BoardBackgroundStyle.storageKey)
+    private var boardBackgroundStyleRawValue = BoardBackgroundStyle.midnight.rawValue
     @State private var search = BoardSearchController()
     @State private var activeCards: [BoardCard] = []
     @State private var activeViewport = CanvasViewport.defaultValue
@@ -59,6 +61,7 @@ struct ContentView: View {
                         selectedCardID: session.selectedCardID,
                         snapToGrid: session.snapToGrid,
                         gridSize: session.gridSize,
+                        backgroundStyle: boardBackgroundStyle,
                         canvasSize: geometry.size,
                         search: search,
                         focusRequest: focusRequest,
@@ -183,6 +186,10 @@ struct ContentView: View {
     private var selectedCard: BoardCard? {
         guard let selectedCardID = session.selectedCardID else { return nil }
         return activeCards.first { $0.id == selectedCardID }
+    }
+
+    private var boardBackgroundStyle: BoardBackgroundStyle {
+        BoardBackgroundStyle(rawValue: boardBackgroundStyleRawValue) ?? .midnight
     }
 
     private func preparePersistentBoards() {

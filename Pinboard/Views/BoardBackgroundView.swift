@@ -9,18 +9,19 @@ struct BoardBackgroundView: View {
     let mode: BoardMode
     let showsGrid: Bool
     let gridSize: Double
+    let backgroundStyle: BoardBackgroundStyle
     let viewport: CanvasViewport
 
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [PinboardTheme.canvasTop, PinboardTheme.canvasBottom],
+                colors: [backgroundStyle.topColor, backgroundStyle.bottomColor],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
             RadialGradient(
-                colors: [Color.indigo.opacity(0.10), .clear],
+                colors: [backgroundStyle.glowColor.opacity(0.10), .clear],
                 center: .topLeading,
                 startRadius: 20,
                 endRadius: 720
@@ -29,18 +30,21 @@ struct BoardBackgroundView: View {
             if showsGrid {
                 GridPattern(
                     spacing: gridSize,
+                    color: backgroundStyle.gridColor,
                     viewport: viewport
                 )
             }
         }
         .opacity(mode == .board ? 1 : 0)
         .animation(.easeInOut(duration: 0.28), value: mode)
+        .animation(.easeInOut(duration: 0.24), value: backgroundStyle)
         .ignoresSafeArea()
     }
 }
 
 private struct GridPattern: View {
     let spacing: Double
+    let color: Color
     let viewport: CanvasViewport
 
     var body: some View {
@@ -68,7 +72,7 @@ private struct GridPattern: View {
                 path.addLine(to: CGPoint(x: size.width, y: y))
             }
 
-            context.stroke(path, with: .color(.white.opacity(0.045)), lineWidth: 0.5)
+            context.stroke(path, with: .color(color), lineWidth: 0.5)
         }
         .allowsHitTesting(false)
     }
