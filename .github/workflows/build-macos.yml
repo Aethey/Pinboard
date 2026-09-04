@@ -74,6 +74,8 @@ jobs:
       - name: Create installable DMG
         id: package
         shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release_tag.outputs.release_tag }}
         run: |
           set -euo pipefail
 
@@ -82,8 +84,12 @@ jobs:
             -scheme Pinboard \
             -configuration Release \
             -showBuildSettings | awk '/ MARKETING_VERSION = / { print $3; exit }')"
-          SHORT_SHA="${GITHUB_SHA:0:7}"
-          ARTIFACT_NAME="Pinboard-${VERSION}-${SHORT_SHA}-macOS"
+          if [[ -n "$RELEASE_TAG" ]]; then
+            ARTIFACT_NAME="Pinboard-${RELEASE_TAG#v}"
+          else
+            SHORT_SHA="${GITHUB_SHA:0:7}"
+            ARTIFACT_NAME="Pinboard-${VERSION}-${SHORT_SHA}-macOS"
+          fi
           APP_SOURCE="$RUNNER_TEMP/Pinboard.xcarchive/Products/Applications/Pinboard.app"
           DMG_ROOT="$RUNNER_TEMP/Pinboard-dmg"
 
