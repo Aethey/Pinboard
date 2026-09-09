@@ -23,15 +23,17 @@ final class PinboardMCPBridge {
 
             let listener = try NWListener(using: parameters, on: Self.port)
             listener.newConnectionHandler = { [weak self] connection in
+                guard let self else { return }
                 Task { @MainActor in
-                    self?.accept(connection)
+                    self.accept(connection)
                 }
             }
             listener.stateUpdateHandler = { [weak self] state in
                 guard case .failed = state else { return }
+                guard let self else { return }
                 Task { @MainActor in
-                    self?.listener?.cancel()
-                    self?.listener = nil
+                    self.listener?.cancel()
+                    self.listener = nil
                 }
             }
             self.listener = listener
@@ -66,7 +68,7 @@ final class PinboardMCPBridge {
             minimumIncompleteLength: 1,
             maximumLength: 16 * 1_024
         ) { [weak self] data, _, isComplete, error in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 guard let self else {
                     connection.cancel()
                     return
