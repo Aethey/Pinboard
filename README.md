@@ -1,6 +1,6 @@
 # Pinboard
 
-[![Build macOS DMG](https://github.com/Aethey/Pinboard/actions/workflows/build-macos.yml/badge.svg)](https://github.com/Aethey/Pinboard/actions/workflows/build-macos.yml)
+
 
 **English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
 
