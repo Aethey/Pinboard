@@ -6,7 +6,7 @@
 import AppKit
 import SwiftUI
 
-struct MarkdownContentView: View {
+struct MarkdownContentView: View, Equatable {
     let markdown: String
     var baseFontSize: CGFloat = 18
     var textWidth: CGFloat?
@@ -16,13 +16,19 @@ struct MarkdownContentView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        let blocks = blocks
+        // Lazy rows must not change horizontal scroll extent as tables enter view.
+        let tableWidth = blocks.reduce(CGFloat.zero) { width, block in
+            guard case let .table(table) = block.kind else { return width }
+            return max(width, table.columnWidths(baseFontSize: baseFontSize).reduce(0, +))
+        }
+        LazyVStack(alignment: .leading, spacing: 7) {
             ForEach(blocks) { block in
                 blockView(block)
             }
         }
         .font(.system(size: baseFontSize))
-        .frame(minWidth: textWidth ?? 0, alignment: .topLeading)
+        .frame(minWidth: max(textWidth ?? 0, tableWidth), alignment: .topLeading)
     }
 
     @ViewBuilder
@@ -156,12 +162,7 @@ struct MarkdownContentView: View {
         _ table: MarkdownTable,
         baseFontSize: CGFloat
     ) -> CGFloat {
-        let columnWidths = table.header.indices.map { column in
-            let values = [table.header[column]] + table.rows.map { $0[column] }
-            let longestValue = values.map(\.count).max() ?? 0
-            let estimatedWidth = CGFloat(longestValue) * baseFontSize * 0.52 + 16
-            return min(280, max(72, estimatedWidth))
-        }
+        let columnWidths = table.columnWidths(baseFontSize: baseFontSize)
         let rows = [table.header] + table.rows
         let rowsHeight = rows.enumerated().reduce(CGFloat.zero) { result, row in
             let font = NSFont.systemFont(
@@ -202,21 +203,13 @@ private struct MarkdownTableView: View {
     let table: MarkdownTable
     let baseFontSize: CGFloat
 
-    private var columnWidths: [CGFloat] {
-        table.header.indices.map { column in
-            let values = [table.header[column]] + table.rows.map { $0[column] }
-            let longestValue = values.map(\.count).max() ?? 0
-            let estimatedWidth = CGFloat(longestValue) * baseFontSize * 0.52 + 16
-            return min(280, max(72, estimatedWidth))
-        }
-    }
-
     var body: some View {
+        let columnWidths = table.columnWidths(baseFontSize: baseFontSize)
         VStack(spacing: 0) {
-            tableRow(table.header, row: 0, isHeader: true)
+            tableRow(table.header, row: 0, isHeader: true, columnWidths: columnWidths)
 
             ForEach(Array(table.rows.enumerated()), id: \.offset) { row, cells in
-                tableRow(cells, row: row + 1, isHeader: false)
+                tableRow(cells, row: row + 1, isHeader: false, columnWidths: columnWidths)
             }
         }
         .fixedSize(horizontal: true, vertical: false)
@@ -230,12 +223,13 @@ private struct MarkdownTableView: View {
     private func tableRow(
         _ cells: [String],
         row: Int,
-        isHeader: Bool
+        isHeader: Bool,
+        columnWidths: [CGFloat]
     ) -> some View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 0) {
                 ForEach(Array(cells.enumerated()), id: \.offset) { column, cell in
-                    tableCell(cell, column: column, isHeader: isHeader)
+                    tableCell(cell, column: column, isHeader: isHeader, width: columnWidths[column])
 
                     if column < cells.count - 1 {
                         Divider()
@@ -253,7 +247,8 @@ private struct MarkdownTableView: View {
     private func tableCell(
         _ source: String,
         column: Int,
-        isHeader: Bool
+        isHeader: Bool,
+        width: CGFloat
     ) -> some View {
         let alignment = table.alignments[column]
 
@@ -263,7 +258,7 @@ private struct MarkdownTableView: View {
                 weight: isHeader ? .semibold : .regular
             ))
             .multilineTextAlignment(alignment.textAlignment)
-            .frame(width: max(0, columnWidths[column] - 16), alignment: alignment.frameAlignment)
+            .frame(width: max(0, width - 16), alignment: alignment.frameAlignment)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
@@ -291,6 +286,24 @@ private struct MarkdownTable {
     let header: [String]
     let alignments: [MarkdownTableAlignment]
     let rows: [[String]]
+    private let longestValues: [Int]
+
+    init(header: [String], alignments: [MarkdownTableAlignment], rows: [[String]]) {
+        self.header = header
+        self.alignments = alignments
+        self.rows = rows
+        var lengths = header.map(\.count)
+        for row in rows {
+            for column in header.indices {
+                lengths[column] = max(lengths[column], row[column].count)
+            }
+        }
+        longestValues = lengths
+    }
+
+    func columnWidths(baseFontSize: CGFloat) -> [CGFloat] {
+        longestValues.map { min(280, max(72, CGFloat($0) * baseFontSize * 0.52 + 16)) }
+    }
 }
 
 private enum MarkdownTableAlignment {
@@ -322,7 +335,29 @@ private enum MarkdownTableAlignment {
 }
 
 private enum MarkdownBlockParser {
+    private final class Document {
+        let blocks: [MarkdownBlock]
+        init(_ blocks: [MarkdownBlock]) { self.blocks = blocks }
+    }
+
+    // Keyed by source, not card ID: edits cannot reuse stale parsed content.
+    // NSCache can evict documents under memory pressure and across board changes.
+    private static let documents: NSCache<NSString, Document> = {
+        let cache = NSCache<NSString, Document>()
+        cache.countLimit = 64
+        cache.totalCostLimit = 8 * 1_024 * 1_024
+        return cache
+    }()
+
     static func parse(_ markdown: String) -> [MarkdownBlock] {
+        let key = markdown as NSString
+        if let document = documents.object(forKey: key) { return document.blocks }
+        let blocks = parseUncached(markdown)
+        documents.setObject(Document(blocks), forKey: key, cost: markdown.utf8.count * 4)
+        return blocks
+    }
+
+    private static func parseUncached(_ markdown: String) -> [MarkdownBlock] {
         let lines = markdown
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
@@ -542,11 +577,33 @@ private struct MarkdownLine {
     }
 }
 
+private enum MarkdownInlineCache {
+    private final class Entry {
+        let text: AttributedString
+        init(_ text: AttributedString) { self.text = text }
+    }
+
+    private static let entries: NSCache<NSString, Entry> = {
+        let cache = NSCache<NSString, Entry>()
+        cache.countLimit = 4_096
+        cache.totalCostLimit = 4 * 1_024 * 1_024
+        return cache
+    }()
+
+    static func text(for source: String) -> AttributedString {
+        let key = source as NSString
+        if let entry = entries.object(forKey: key) { return entry.text }
+        let text = (try? AttributedString(
+            markdown: source,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(source)
+        entries.setObject(Entry(text), forKey: key, cost: source.utf8.count * 4)
+        return text
+    }
+}
+
 private func parseInlineMarkdown(_ source: String) -> AttributedString {
-    (try? AttributedString(
-        markdown: source,
-        options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-    )) ?? AttributedString(source)
+    MarkdownInlineCache.text(for: source)
 }
 
 #Preview("Markdown table") {

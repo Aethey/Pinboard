@@ -1,0 +1,74 @@
+{
+  "cards": 12,
+  "harness": "Standalone NSHostingView; programmatic scroll targets and offsets, not trackpad events",
+  "os": "Version 26.6.2 (Build 25G83)",
+  "samples": [
+    {
+      "cpu_seconds": 0.06942300000000001,
+      "iteration": 1,
+      "operation": "initial_layout",
+      "wall_seconds": 0.3085893749957904
+    },
+    {
+      "cpu_seconds": 0.06280999999999999,
+      "iteration": 1,
+      "operation": "scroll_first_card",
+      "wall_seconds": 0.3488587500178255
+    },
+    {
+      "cpu_seconds": 0.050100000000000006,
+      "iteration": 2,
+      "operation": "scroll_first_card",
+      "wall_seconds": 0.3391965416376479
+    },
+    {
+      "cpu_seconds": 0.04192299999999999,
+      "iteration": 3,
+      "operation": "scroll_first_card",
+      "wall_seconds": 0.33864379167789593
+    },
+    {
+      "cpu_seconds": 0.050034999999999996,
+      "iteration": 4,
+      "operation": "scroll_first_card",
+      "wall_seconds": 0.33596250001573935
+    },
+    {
+      "cpu_seconds": 0.04167599999999999,
+      "iteration": 5,
+      "operation": "scroll_first_card",
+      "wall_seconds": 0.33560175000457093
+    },
+    {
+      "cpu_seconds": 0.061861,
+      "iteration": 1,
+      "operation": "pan_all_cards",
+      "wall_seconds": 0.34812974999658763
+    },
+    {
+      "cpu_seconds": 0.055257,
+      "iteration": 2,
+      "operation": "pan_all_cards",
+      "wall_seconds": 0.3377442083437927
+    },
+    {
+      "cpu_seconds": 0.053744000000000014,
+      "iteration": 3,
+      "operation": "pan_all_cards",
+      "wall_seconds": 0.33829437498934567
+    },
+    {
+      "cpu_seconds": 0.052332000000000045,
+      "iteration": 4,
+      "operation": "pan_all_cards",
+      "wall_seconds": 0.33853958337567747
+    },
+    {
+      "cpu_seconds": 0.05305300000000002,
+      "iteration": 5,
+      "operation": "pan_all_cards",
+      "wall_seconds": 0.3410050416714512
+    }
+  ],
+  "sections_per_card": 24
+}

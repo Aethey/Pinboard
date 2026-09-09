@@ -367,10 +367,12 @@ struct BoardCardView: View {
                             baseFontSize: card.fontSize.pointSize,
                             textWidth: contentWidth
                         )
+                        .equatable()
                         .textSelection(.enabled)
                         .padding(10)
                     }
                     .scrollIndicators(.visible)
+                    .accessibilityIdentifier("markdown-scroll-\(card.id.uuidString)")
                 }
             }
 

@@ -15,7 +15,7 @@ final class PinboardPerformanceTests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         let profile = ProcessInfo.processInfo.environment["PINBOARD_PERFORMANCE_FIXTURE"]
-            ?? "normal"
+            ?? (name.contains("testMarkdown") ? "markdown" : "normal")
         launch(profile: profile)
     }
 
@@ -122,6 +122,34 @@ final class PinboardPerformanceTests: XCTestCase {
             let movedEnd = movedStart.withOffset(CGVector(dx: -120, dy: -72))
             movedStart.press(forDuration: 0.08, thenDragTo: movedEnd)
             self.settle(0.20)
+        }
+    }
+
+    func testMarkdownScrollCycle() throws {
+        // Use PINBOARD_PERFORMANCE_FIXTURE=markdown for the long-document workload.
+        let preview = element("markdown-scroll-\(primaryCardID)")
+        XCTAssertTrue(preview.waitForExistence(timeout: 8))
+        settle(1)
+        measureInteraction {
+            preview.scroll(byDeltaX: 0, deltaY: -500)
+            self.settle(0.25)
+            preview.scroll(byDeltaX: 0, deltaY: 500)
+            self.settle(0.25)
+        }
+    }
+
+    func testMarkdownCanvasPanCycle() throws {
+        let window = app.windows.firstMatch
+        XCTAssertTrue(element("markdown-scroll-\(primaryCardID)").waitForExistence(timeout: 8))
+        settle(1)
+        // The left margin is clear of cards in the markdown fixture.
+        let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.75))
+        let end = start.withOffset(CGVector(dx: 0, dy: -140))
+        measureInteraction {
+            start.press(forDuration: 0.05, thenDragTo: end)
+            self.settle(0.25)
+            end.press(forDuration: 0.05, thenDragTo: start)
+            self.settle(0.25)
         }
     }
 

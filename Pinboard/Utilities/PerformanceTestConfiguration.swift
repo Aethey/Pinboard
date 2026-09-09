@@ -10,6 +10,7 @@ enum PerformanceFixtureProfile: String, CaseIterable {
     case normal
     case heavy
     case stress
+    case markdown
 
     var cardCount: Int {
         switch self {
@@ -19,6 +20,8 @@ enum PerformanceFixtureProfile: String, CaseIterable {
             150
         case .stress:
             500
+        case .markdown:
+            12
         }
     }
 
@@ -30,6 +33,8 @@ enum PerformanceFixtureProfile: String, CaseIterable {
             0.50
         case .stress:
             0.30
+        case .markdown:
+            0.82
         }
     }
 }
@@ -89,7 +94,7 @@ enum PerformanceFixture {
 
         for board in [primary, secondary] {
             for index in 0..<profile.cardCount {
-                modelContext.insert(makeCard(index: index, boardID: board.id, timestamp: now))
+                modelContext.insert(makeCard(index: index, boardID: board.id, timestamp: now, profile: profile))
             }
         }
 
@@ -97,10 +102,10 @@ enum PerformanceFixture {
         return primary
     }
 
-    private static func makeCard(index: Int, boardID: UUID, timestamp: Date) -> BoardCard {
-        let kind = benchmarkKinds[index % benchmarkKinds.count]
+    private static func makeCard(index: Int, boardID: UUID, timestamp: Date, profile: PerformanceFixtureProfile) -> BoardCard {
+        let kind: CardKind = profile == .markdown ? .markdown : benchmarkKinds[index % benchmarkKinds.count]
         let size = size(for: kind)
-        let columnCount = 20
+        let columnCount = profile == .markdown ? 4 : 20
         let column = index % columnCount
         let row = index / columnCount
         let x = 180 + Double(column) * 350
@@ -113,7 +118,7 @@ enum PerformanceFixture {
                 : deterministicCardID(index: index, boardID: boardID),
             kind: kind,
             title: "Benchmark \(kind.title) \(index + 1)",
-            content: content(for: kind, index: index),
+            content: profile == .markdown ? longMarkdown(index: index) : content(for: kind, index: index),
             boardID: boardID,
             imagePixelWidth: kind == .image ? 1600 : nil,
             imagePixelHeight: kind == .image ? 1000 : nil,
@@ -143,6 +148,26 @@ enum PerformanceFixture {
         .pdf,
         .image,
     ]
+
+    private static func longMarkdown(index: Int) -> String {
+        (0..<24).map { section in
+            """
+            ## Card \(index + 1) / Section \(section + 1)
+
+            Markdown scrolling sample with **bold**, *italic*, `inline code` and [a link](https://example.com).
+            多张 Markdown 卡片同时显示，滚动时应保持流畅，并保留换行、字号和文字选择。
+            - First item with enough text to wrap across several lines in a narrow card.
+            - Second item with **formatting** and `code`.
+            1. Numbered item
+
+            | Feature | Description | Status |
+            | :--- | :--- | ---: |
+            | Scrolling | Preserve smooth scrolling and text selection | Ready |
+            | Layout | Wrap paragraphs but allow wide tables to scroll horizontally | Ready |
+
+            """
+        }.joined(separator: "\n")
+    }
 
     private static func size(for kind: CardKind) -> (width: Double, height: Double) {
         switch kind {

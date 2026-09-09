@@ -64,6 +64,7 @@ This switch is available only as a launch environment for testing; it does not a
 
 ## Recorded runs
 
+- [Markdown rendering comparison](results/2026-09-09-markdown-rendering.md) — lazy rendering and parser caching, standalone CPU samples, and the UI-test startup limitation.
 - [Selection and Fit Content comparison](results/2026-09-04-selection-performance-comparison.md) — before/after measurements for the multi-selection performance work, including the improved Fit Content path and the unresolved selected-card zoom hitch regression.
 - [Original motion baseline](results/2026-08-31-motion-baseline.md) — the valid before-change measurements and an honest record of two initial test-harness failures.
 - [Final comparison](results/2026-08-31-motion-comparison.md) — the accepted animation implementation, before/after figures, and final pass status.
