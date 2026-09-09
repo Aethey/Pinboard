@@ -1,9 +1,6 @@
 name: Build macOS DMG
 
 on:
-  push:
-    tags:
-      - "v*"
   pull_request:
     branches:
       - main
@@ -20,43 +17,16 @@ concurrency:
 
 jobs:
   build:
-    name: Archive and package
+    name: Build and test
     if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: macos-26
     timeout-minutes: 30
-    outputs:
-      artifact_name: ${{ steps.package.outputs.artifact_name }}
-      release_tag: ${{ steps.release_tag.outputs.release_tag }}
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.ref }}
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Resolve release tag
-        id: release_tag
-        shell: bash
-        run: |
-          set -euo pipefail
-          RELEASE_TAG=""
-
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            RELEASE_TAG="$GITHUB_REF_NAME"
-          elif [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
-            RELEASE_TAG="$(git tag --points-at "$GITHUB_SHA" --list 'v*' | sort -V | tail -n 1)"
-          fi
-
-          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Show build environment
-        run: |
-          sw_vers
-          xcodebuild -version
 
       - name: Resolve Swift packages
         run: |
@@ -65,159 +35,21 @@ jobs:
             -scheme Pinboard \
             -resolvePackageDependencies
 
-      - name: Archive Pinboard
+      - name: Build
         run: |
-          xcodebuild archive \
+          xcodebuild build \
             -project Pinboard.xcodeproj \
             -scheme Pinboard \
-            -configuration Release \
-            -destination "generic/platform=macOS" \
-            -archivePath "$RUNNER_TEMP/Pinboard.xcarchive" \
+            -configuration Debug \
+            -destination "platform=macOS" \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Create installable DMG
-        id: package
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ steps.release_tag.outputs.release_tag }}
+      - name: Run tests
         run: |
-          set -euo pipefail
-
-          VERSION="$(xcodebuild \
+          xcodebuild test \
             -project Pinboard.xcodeproj \
             -scheme Pinboard \
-            -configuration Release \
-            -showBuildSettings | awk '/ MARKETING_VERSION = / { print $3; exit }')"
-          if [[ -n "$RELEASE_TAG" ]]; then
-            ARTIFACT_NAME="Pinboard-${RELEASE_TAG#v}"
-          else
-            SHORT_SHA="${GITHUB_SHA:0:7}"
-            ARTIFACT_NAME="Pinboard-${VERSION}-${SHORT_SHA}-macOS"
-          fi
-          APP_SOURCE="$RUNNER_TEMP/Pinboard.xcarchive/Products/Applications/Pinboard.app"
-          DMG_ROOT="$RUNNER_TEMP/Pinboard-dmg"
+            -configuration Debug \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO
 
-          test -d "$APP_SOURCE"
-          mkdir -p "$DMG_ROOT" dist
-          ditto "$APP_SOURCE" "$DMG_ROOT/Pinboard.app"
-
-          lipo "$DMG_ROOT/Pinboard.app/Contents/MacOS/Pinboard" -verify_arch arm64 x86_64
-          lipo "$DMG_ROOT/Pinboard.app/Contents/MacOS/pinboard-mcp" -verify_arch arm64 x86_64
-
-          codesign --force --sign - "$DMG_ROOT/Pinboard.app/Contents/MacOS/pinboard-mcp"
-          codesign \
-            --force \
-            --sign - \
-            --entitlements Pinboard/Pinboard.entitlements \
-            "$DMG_ROOT/Pinboard.app"
-          codesign --verify --deep --strict "$DMG_ROOT/Pinboard.app"
-
-          ln -s /Applications "$DMG_ROOT/Applications"
-          hdiutil create \
-            -volname Pinboard \
-            -srcfolder "$DMG_ROOT" \
-            -ov \
-            -format UDZO \
-            "dist/${ARTIFACT_NAME}.dmg"
-          hdiutil verify "dist/${ARTIFACT_NAME}.dmg"
-
-          pushd dist >/dev/null
-          shasum -a 256 "${ARTIFACT_NAME}.dmg" > "${ARTIFACT_NAME}.dmg.sha256"
-          popd >/dev/null
-
-          echo "artifact_name=${ARTIFACT_NAME}" >> "$GITHUB_OUTPUT"
-
-      - name: Upload macOS package
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.package.outputs.artifact_name }}
-          path: |
-            dist/*.dmg
-            dist/*.sha256
-          if-no-files-found: error
-          retention-days: 14
-
-  release:
-    name: Publish GitHub Release
-    if: needs.build.outputs.release_tag != ''
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Check out repository and tags
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Verify tagged commit is on main
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
-        run: |
-          set -euo pipefail
-          git fetch origin main
-          TAG_COMMIT="$(git rev-list -n 1 "$RELEASE_TAG")"
-
-          if ! git merge-base --is-ancestor "$TAG_COMMIT" origin/main; then
-            echo "Tag $RELEASE_TAG does not point to a commit on main." >&2
-            exit 1
-          fi
-
-      - name: Download packaged DMG
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.build.outputs.artifact_name }}
-          path: dist
-
-      - name: Read annotated tag message
-        id: notes
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
-        run: |
-          set -euo pipefail
-          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
-
-          if [[ "$(git cat-file -t "refs/tags/$RELEASE_TAG")" == "tag" ]]; then
-            git for-each-ref \
-              --format='%(contents:subject)%0a%0a%(contents:body)' \
-              "refs/tags/$RELEASE_TAG" > "$NOTES_FILE"
-          else
-            : > "$NOTES_FILE"
-          fi
-
-          echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
-
-      - name: Create or update GitHub Release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NOTES_FILE: ${{ steps.notes.outputs.notes_file }}
-          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
-        run: |
-          set -euo pipefail
-
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" dist/* --clobber
-            gh release edit \
-              "$RELEASE_TAG" \
-              --title "$RELEASE_TAG" \
-              --notes-file "$NOTES_FILE"
-          elif [[ "$RELEASE_TAG" == *-* ]]; then
-            gh release create \
-              "$RELEASE_TAG" \
-              dist/* \
-              --verify-tag \
-              --title "$RELEASE_TAG" \
-              --notes-file "$NOTES_FILE" \
-              --prerelease
-          else
-            gh release create \
-              "$RELEASE_TAG" \
-              dist/* \
-              --verify-tag \
-              --title "$RELEASE_TAG" \
-              --notes-file "$NOTES_FILE"
-          fi

@@ -13,19 +13,19 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		B10000000000000000000007 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 12AF63C33040415E009C8856 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 12AF63CA3040415E009C8856;
-			remoteInfo = Pinboard;
-		};
 		A10000000000000000000011 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 12AF63C33040415E009C8856 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = A1000000000000000000000A;
 			remoteInfo = PinboardMCP;
+		};
+		B10000000000000000000007 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 12AF63C33040415E009C8856 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 12AF63CA3040415E009C8856;
+			remoteInfo = Pinboard;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -45,11 +45,11 @@
 
 /* Begin PBXFileReference section */
 		12AF63CB3040415E009C8856 /* Pinboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pinboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		B10000000000000000000001 /* PinboardPerformanceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PinboardPerformanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000001 /* pinboard-mcp */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "pinboard-mcp"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000002 /* PinboardMCP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinboardMCP.swift; sourceTree = "<group>"; };
 		A10000000000000000000013 /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = "<group>"; };
 		A10000000000000000000014 /* Package.resolved */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Package.resolved; sourceTree = "<group>"; };
+		B10000000000000000000001 /* PinboardPerformanceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PinboardPerformanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -449,7 +449,7 @@
 				CODE_SIGN_ENTITLEMENTS = Pinboard/Pinboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 38N3R8P926;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -484,7 +484,7 @@
 				CODE_SIGN_ENTITLEMENTS = Pinboard/Pinboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 38N3R8P926;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
